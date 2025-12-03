@@ -1,37 +1,36 @@
 package com.example.musicdna.ui.profile
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.musicdna.analytics.AnalyticsEngine
 import com.example.musicdna.data.dummyListeningHistory
 import com.example.musicdna.data.dummyMusicList
-import com.example.musicdna.model.MusicGenre
+import com.example.musicdna.model.MusicDnaProfile
 import com.example.musicdna.model.User
+import com.example.musicdna.model.MusicGenre
+
+// Enum để quản lý các view một cách an toàn và rõ ràng
+private enum class DnaView {
+    RADAR, ARTISTS, COUNTRIES
+}
 
 @Composable
 fun ProfileScreen() {
@@ -50,9 +49,6 @@ fun ProfileScreen() {
     }
     var showEditDialog by remember { mutableStateOf(false) }
 
-    // =======================================================================
-    // BƯỚC 4.1: TÍNH TOÁN DỮ LIỆU DNA MỘT LẦN DUY NHẤT Ở ĐÂY
-    // =======================================================================
     val dnaProfile = remember {
         AnalyticsEngine.calculateDnaProfile(dummyListeningHistory, dummyMusicList)
     }
@@ -71,15 +67,10 @@ fun ProfileScreen() {
         Spacer(modifier = Modifier.height(24.dp))
 
         // =======================================================================
-        // BƯỚC 4.2: CẬP NHẬT CÁC SECTION ĐỂ NHẬN DỮ LIỆU TỪ `dnaProfile`
+        // THAY ĐỔI LỚN: Gọi MusicDNASection mới và truyền toàn bộ dnaProfile.
+        // Xóa bỏ hoàn toàn lời gọi TopArtistsAndCountriesSection cũ.
         // =======================================================================
-        MusicDNASection(genreData = dnaProfile.genreDistribution)
-        Spacer(modifier = Modifier.height(24.dp))
-
-        TopArtistsAndCountriesSection(
-            topArtists = dnaProfile.topArtists,
-            topCountries = dnaProfile.topCountries
-        )
+        MusicDNASection(dnaProfile = dnaProfile)
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
@@ -103,97 +94,135 @@ fun ProfileScreen() {
     }
 }
 
-
-// =======================================================================
-// BƯỚC 4.3: ĐỊNH NGHĨA COMPOSABLE MỚI VÀ CẬP NHẬT COMPOSABLE CŨ
-// =======================================================================
-
 /**
- * Composable hiển thị biểu đồ Radar.
- * QUAN TRỌNG: Chữ ký hàm đã thay đổi để nhận `genreData` từ bên ngoài.
+ * Composable MusicDNASection đã được tái cấu trúc hoàn toàn.
+ * Giờ đây nó nhận toàn bộ dnaProfile và tự quản lý việc hiển thị các view khác nhau.
  */
 @Composable
-fun MusicDNASection(genreData: Map<MusicGenre, Float>) {
+fun MusicDNASection(dnaProfile: MusicDnaProfile) {
+    // 1. State để quản lý view hiện tại, mặc định là biểu đồ RADAR
+    var currentView by remember { mutableStateOf(DnaView.RADAR) }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Text(
-            "Music DNA",
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
+        // Hàng chứa tiêu đề và các nút chuyển đổi
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Music DNA",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+            // 2. Giao diện chuyển đổi (Switcher)
+            DnaViewSwitcher(
+                selectedView = currentView,
+                onViewSelected = { newView -> currentView = newView }
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Box nền chính
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF1A1A1A), RoundedCornerShape(20.dp))
-                .padding(16.dp),
+                .padding(16.dp)
+                .animateContentSize(), // Thêm hiệu ứng chuyển động mượt mà khi đổi view
             contentAlignment = Alignment.Center
         ) {
-            // RadarChart giờ sử dụng dữ liệu được truyền vào
-            RadarChart(
-                dnaData = genreData,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-            )
+            // 3. Hiển thị nội dung động dựa trên state
+            when (currentView) {
+                DnaView.RADAR -> RadarChart(
+                    dnaData = dnaProfile.genreDistribution,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                )
+                DnaView.ARTISTS -> TopItemsList(
+                    title = "Top Artists",
+                    items = dnaProfile.topArtists
+                )
+                DnaView.COUNTRIES -> TopItemsList(
+                    title = "Top Markets",
+                    items = dnaProfile.topCountries
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun DnaViewSwitcher(selectedView: DnaView, onViewSelected: (DnaView) -> Unit) {
+    Row(
+        modifier = Modifier
+            .background(Color(0xFF2C2C2C), RoundedCornerShape(50))
+            .padding(4.dp)
+    ) {
+        DnaViewButton("DNA", selectedView == DnaView.RADAR) { onViewSelected(DnaView.RADAR) }
+        DnaViewButton("Artists", selectedView == DnaView.ARTISTS) { onViewSelected(DnaView.ARTISTS) }
+        DnaViewButton("Markets", selectedView == DnaView.COUNTRIES) { onViewSelected(DnaView.COUNTRIES) }
+    }
+}
+
+@Composable
+private fun DnaViewButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (isSelected) Color.DarkGray else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (isSelected) Color.White else Color.Gray,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
 /**
- * Composable mới để hiển thị Top 5 nghệ sĩ và Top 5 thị trường.
+ * Composable tái sử dụng để hiển thị danh sách Top 5 (Nghệ sĩ hoặc Quốc gia).
  */
 @Composable
-fun TopArtistsAndCountriesSection(
-    topArtists: List<Pair<String, Int>>,
-    topCountries: List<Pair<String, Int>>
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start
     ) {
-        // Cột Top Nghệ sĩ
-        Column(modifier = Modifier.weight(1f)) {
+        Text(
+            title,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        // Nếu không có dữ liệu, hiển thị thông báo
+        if (items.isEmpty()){
             Text(
-                "Top Artists",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                "Not enough data yet.",
+                color = Color.Gray,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            topArtists.forEachIndexed { index, artist ->
+        } else {
+            items.forEachIndexed { index, item ->
                 Text(
-                    text = "${index + 1}. ${artist.first} (${artist.second})",
+                    text = "${index + 1}. ${item.first} (${item.second} songs)",
                     color = Color.Gray,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-        }
-        // Cột Top Quốc gia
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "Top Markets",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            topCountries.forEachIndexed { index, country ->
-                Text(
-                    text = "${index + 1}. ${country.first} (${country.second})",
-                    color = Color.Gray,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
 }
-
 
 @Preview(showBackground = true, name = "Profile Screen Preview", backgroundColor = 0xFF0A0A0A)
 @Composable
