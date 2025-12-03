@@ -9,8 +9,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.musicdna"
-        minSdk = 24
+        applicationId = "com.example.myapplication"
+        minSdk = 35
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -40,7 +40,7 @@ android {
 }
 
 dependencies {
-    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material:material-icons-extended-android:1.6.7")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -49,7 +49,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.foundation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
