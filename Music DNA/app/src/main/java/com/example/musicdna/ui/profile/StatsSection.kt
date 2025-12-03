@@ -4,36 +4,64 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope // Import RowScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.musicdna.model.ListeningHistory
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
-fun StatsSection() {
+fun StatsSection(
+    // 1. Nhận vào danh sách lịch sử nghe nhạc
+    listeningHistory: List<ListeningHistory>
+) {
+    // 2. Tính toán số lượng bài hát yêu thích từ dữ liệu được truyền vào
+    val songsLikedCount = remember(listeningHistory) {
+        listeningHistory.count { it.isFavourite }
+    }
+
+    // 3. Định dạng số để có dấu phẩy (ví dụ: 1,247), giúp UI đẹp hơn
+    val formattedSongsLiked = remember(songsLikedCount) {
+        NumberFormat.getNumberInstance(Locale.US).format(songsLikedCount)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        // Dùng SpaceAround để khoảng cách giữa các card đều nhau và đẹp hơn
+        horizontalArrangement = Arrangement.SpaceAround
     ) {
-        // Apply the weight modifier here
-        StatCard("1,247", "Songs Liked", Color(0xFF8B1FA0), modifier = Modifier.weight(1f))
-        StatCard("89", "Parties Joined", Color(0xFF0D47A1), modifier = Modifier.weight(1f))
+        // 4. Sử dụng giá trị đã tính toán thay vì hardcode
+        StatCard(
+            value = formattedSongsLiked,
+            label = "Songs Liked",
+            color = Color(0xFF8B1FA0),
+            modifier = Modifier.weight(1f)
+        )
+        StatCard(
+            value = "89", // Giữ nguyên giá trị giả lập cho "Parties Joined"
+            label = "Parties Joined",
+            color = Color(0xFF0D47A1),
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
 @Composable
 fun RowScope.StatCard(value: String, label: String, color: Color, modifier: Modifier = Modifier) {
-    // Use the passed-in modifier
+    // Cấu trúc của StatCard không thay đổi
     Column(
         modifier = modifier
             .padding(8.dp)

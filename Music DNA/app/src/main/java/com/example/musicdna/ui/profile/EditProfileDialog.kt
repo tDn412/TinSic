@@ -23,7 +23,6 @@ import com.example.musicdna.model.User
 fun EditProfileDialog(
     user: User,
     onDismiss: () -> Unit,
-    // Cập nhật hàm onSave để nhận thêm mật khẩu mới (nếu có)
     onSave: (newName: String, newEmail: String, newPassword: String?) -> Unit
 ) {
     // Trạng thái cho các trường thông tin cơ bản
@@ -78,15 +77,14 @@ fun EditProfileDialog(
                     }
                 }
 
-                // Khi người dùng bấm "Change Password", hiển thị các trường liên quan
                 if (isChangingPassword) {
-                    // Mật khẩu hiện tại
                     PasswordTextField(
                         value = currentPassword,
-                        onValueChange = { currentPassword = it },
+                        onValueChange = { currentPassword = it; passwordError = null }, // Xóa lỗi khi người dùng nhập lại
                         label = "Current Password",
                         isVisible = isCurrentPasswordVisible,
-                        onVisibilityChange = { isCurrentPasswordVisible = !isCurrentPasswordVisible }
+                        onVisibilityChange = { isCurrentPasswordVisible = !isCurrentPasswordVisible },
+                        isError = passwordError?.contains("current password", ignoreCase = true) == true // Hiển thị lỗi nếu sai mật khẩu cũ
                     )
 
                     // Mật khẩu mới
@@ -105,10 +103,10 @@ fun EditProfileDialog(
                         label = "Confirm New Password",
                         isVisible = isConfirmPasswordVisible,
                         onVisibilityChange = { isConfirmPasswordVisible = !isConfirmPasswordVisible },
-                        isError = passwordError != null // Hiển thị lỗi nếu có
+                        isError = passwordError != null && passwordError?.contains("match") == true // Hiển thị lỗi nếu mật khẩu không khớp
                     )
 
-                    // Hiển thị thông báo lỗi nếu mật khẩu không khớp
+                    // Hiển thị thông báo lỗi
                     if(passwordError != null) {
                         Text(text = passwordError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
@@ -118,22 +116,39 @@ fun EditProfileDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    var finalNewPassword: String? = null
+                    // *** BẮT ĐẦU LOGIC XÁC THỰC MỚI ***
                     if (isChangingPassword) {
-                        // Logic kiểm tra mật khẩu
-                        // TODO: Thêm logic kiểm tra mật khẩu hiện tại với server
+                        // 1. Kiểm tra mật khẩu hiện tại
+                        if (currentPassword != user.password) {
+                            passwordError = "Incorrect current password."
+                            return@Button // Dừng lại, không cho lưu
+                        }
+
+                        // 2. Kiểm tra các trường mật khẩu mới có trống không
                         if (newPassword.isBlank() || confirmNewPassword.isBlank()) {
-                            passwordError = "Password fields cannot be empty."
+                            passwordError = "New password fields cannot be empty."
                             return@Button
                         }
+
+                        // 3. Kiểm tra mật khẩu mới và xác nhận có khớp không
                         if (newPassword != confirmNewPassword) {
-                            passwordError = "Passwords do not match."
+                            passwordError = "New passwords do not match."
                             return@Button
                         }
-                        // Nếu mọi thứ hợp lệ
-                        finalNewPassword = newPassword
+
+                        // 4. KIỂM TRA MỚI: Mật khẩu mới không được giống mật khẩu cũ
+                        if (newPassword == user.password) {
+                            passwordError = "New password cannot be the same as the old one."
+                            return@Button // Dừng lại, không cho lưu
+                        }
+
+                        // 5. Nếu mọi thứ hợp lệ, gọi hàm onSave với mật khẩu mới
+                        onSave(tempName, tempEmail, newPassword)
+                    } else {
+                        // Nếu không đổi mật khẩu, chỉ lưu tên và email
+                        onSave(tempName, tempEmail, null)
                     }
-                    onSave(tempName, tempEmail, finalNewPassword)
+                    // *** KẾT THÚC LOGIC XÁC THỰC MỚI ***
                 }
             ) {
                 Text("Save")

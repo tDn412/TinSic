@@ -1,47 +1,61 @@
 package com.example.musicdna.ui.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.musicdna.analytics.AnalyticsEngine
+import com.example.musicdna.data.dummyListeningHistory
+import com.example.musicdna.data.dummyMusicList
+import com.example.musicdna.model.MusicGenre
 import com.example.musicdna.model.User
-// SỬA LỖI 1: Sửa lại đường dẫn import
-import com.example.musicdna.ui.profile.EditProfileDialog
-
 
 @Composable
 fun ProfileScreen() {
     val scrollState = rememberScrollState()
 
-    // Dữ liệu người dùng (giả lập)
     var user by remember {
         mutableStateOf(
             User(
                 userId = "uid123",
                 name = "Alex Johnson",
                 email = "alex.j@example.com",
-                // Lưu ý: Không nên lưu mật khẩu dạng plain-text trong model, đây chỉ là giả lập
                 password = "password123",
                 avatarUrl = null
             )
         )
     }
-
-    // Trạng thái để điều khiển việc hiển thị dialog
     var showEditDialog by remember { mutableStateOf(false) }
+
+    // =======================================================================
+    // BƯỚC 4.1: TÍNH TOÁN DỮ LIỆU DNA MỘT LẦN DUY NHẤT Ở ĐÂY
+    // =======================================================================
+    val dnaProfile = remember {
+        AnalyticsEngine.calculateDnaProfile(dummyListeningHistory, dummyMusicList)
+    }
 
     Column(
         modifier = Modifier
@@ -50,53 +64,138 @@ fun ProfileScreen() {
             .background(Color(0xFF0A0A0A))
             .padding(bottom = 80.dp)
     ) {
-        // Truyền dữ liệu user và lambda function để mở dialog
-        HeaderSection(
-            user = user,
-            onEditProfileClick = {
-                showEditDialog = true
-            }
-        )
+        HeaderSection(user = user, onEditProfileClick = { showEditDialog = true })
         Spacer(modifier = Modifier.height(16.dp))
 
-        StatsSection()
+        StatsSection(listeningHistory = dummyListeningHistory)
         Spacer(modifier = Modifier.height(24.dp))
 
-        MusicDNASection()
+        // =======================================================================
+        // BƯỚC 4.2: CẬP NHẬT CÁC SECTION ĐỂ NHẬN DỮ LIỆU TỪ `dnaProfile`
+        // =======================================================================
+        MusicDNASection(genreData = dnaProfile.genreDistribution)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        TopArtistsAndCountriesSection(
+            topArtists = dnaProfile.topArtists,
+            topCountries = dnaProfile.topCountries
+        )
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
         Spacer(modifier = Modifier.height(16.dp))
     }
 
-    // Hiển thị dialog nếu `showEditDialog` là true
     if (showEditDialog) {
         EditProfileDialog(
             user = user,
-            onDismiss = { showEditDialog = false }, // Ẩn dialog khi hủy
-            // SỬA LỖI 2: Cập nhật hàm onSave để nhận 3 tham số
+            onDismiss = { showEditDialog = false },
             onSave = { newName, newEmail, newPassword ->
-                // Cập nhật lại thông tin user
-                user = user.copy(name = newName, email = newEmail)
-
-                // Nếu có mật khẩu mới, hãy xử lý nó
+                val updatedUser = user.copy(name = newName, email = newEmail)
                 if (newPassword != null) {
-                    // TODO: Gọi ViewModel hoặc Repository để cập nhật mật khẩu mới một cách an toàn
-                    // Ví dụ: viewModel.changePassword(user.userId, currentPassword, newPassword)
-                    println("Yêu cầu thay đổi mật khẩu thành: $newPassword") // Dùng để debug
+                    user = updatedUser.copy(password = newPassword)
+                } else {
+                    user = updatedUser
                 }
-
-                showEditDialog = false // Đóng dialog sau khi lưu
+                showEditDialog = false
             }
         )
     }
 }
 
-@Preview(
-    showBackground = true,
-    name = "Profile Screen Preview",
-    backgroundColor = 0xFF0A0A0A
-)
+
+// =======================================================================
+// BƯỚC 4.3: ĐỊNH NGHĨA COMPOSABLE MỚI VÀ CẬP NHẬT COMPOSABLE CŨ
+// =======================================================================
+
+/**
+ * Composable hiển thị biểu đồ Radar.
+ * QUAN TRỌNG: Chữ ký hàm đã thay đổi để nhận `genreData` từ bên ngoài.
+ */
+@Composable
+fun MusicDNASection(genreData: Map<MusicGenre, Float>) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            "Music DNA",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF1A1A1A), RoundedCornerShape(20.dp))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // RadarChart giờ sử dụng dữ liệu được truyền vào
+            RadarChart(
+                dnaData = genreData,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+            )
+        }
+    }
+}
+
+/**
+ * Composable mới để hiển thị Top 5 nghệ sĩ và Top 5 thị trường.
+ */
+@Composable
+fun TopArtistsAndCountriesSection(
+    topArtists: List<Pair<String, Int>>,
+    topCountries: List<Pair<String, Int>>
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Cột Top Nghệ sĩ
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Top Artists",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            topArtists.forEachIndexed { index, artist ->
+                Text(
+                    text = "${index + 1}. ${artist.first} (${artist.second})",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+        // Cột Top Quốc gia
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Top Markets",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            topCountries.forEachIndexed { index, country ->
+                Text(
+                    text = "${index + 1}. ${country.first} (${country.second})",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+
+@Preview(showBackground = true, name = "Profile Screen Preview", backgroundColor = 0xFF0A0A0A)
 @Composable
 fun ProfileScreenPreview() {
     ProfileScreen()
