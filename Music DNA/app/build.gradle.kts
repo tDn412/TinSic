@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation("dev.shreyaspatil:capturable:1.0.3")
     implementation("androidx.compose.material:material-icons-extended-android:1.6.7")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

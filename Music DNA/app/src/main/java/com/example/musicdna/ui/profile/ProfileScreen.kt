@@ -7,10 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,17 +26,13 @@ import com.example.musicdna.data.dummyListeningHistory
 import com.example.musicdna.data.dummyMusicList
 import com.example.musicdna.model.MusicDnaProfile
 import com.example.musicdna.model.User
-import com.example.musicdna.model.MusicGenre
 
 // Enum để quản lý các view một cách an toàn và rõ ràng
-private enum class DnaView {
-    RADAR, ARTISTS, COUNTRIES
-}
+private enum class DnaView { RADAR, ARTISTS, COUNTRIES }
 
 @Composable
 fun ProfileScreen() {
     val scrollState = rememberScrollState()
-
     var user by remember {
         mutableStateOf(
             User(
@@ -66,10 +63,6 @@ fun ProfileScreen() {
         StatsSection(listeningHistory = dummyListeningHistory)
         Spacer(modifier = Modifier.height(24.dp))
 
-        // =======================================================================
-        // THAY ĐỔI LỚN: Gọi MusicDNASection mới và truyền toàn bộ dnaProfile.
-        // Xóa bỏ hoàn toàn lời gọi TopArtistsAndCountriesSection cũ.
-        // =======================================================================
         MusicDNASection(dnaProfile = dnaProfile)
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -95,16 +88,14 @@ fun ProfileScreen() {
 }
 
 /**
- * Composable MusicDNASection đã được tái cấu trúc hoàn toàn.
- * Giờ đây nó nhận toàn bộ dnaProfile và tự quản lý việc hiển thị các view khác nhau.
+ * •Composable MusicDNASection đã được tái cấu trúc hoàn toàn.
+ * •Giờ đây nó nhận toàn bộ dnaProfile và tự quản lý việc hiển thị các view khác nhau.
  */
 @Composable
 fun MusicDNASection(dnaProfile: MusicDnaProfile) {
-    // 1. State để quản lý view hiện tại, mặc định là biểu đồ RADAR
     var currentView by remember { mutableStateOf(DnaView.RADAR) }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        // Hàng chứa tiêu đề và các nút chuyển đổi
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -116,7 +107,6 @@ fun MusicDNASection(dnaProfile: MusicDnaProfile) {
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
-            // 2. Giao diện chuyển đổi (Switcher)
             DnaViewSwitcher(
                 selectedView = currentView,
                 onViewSelected = { newView -> currentView = newView }
@@ -124,16 +114,14 @@ fun MusicDNASection(dnaProfile: MusicDnaProfile) {
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Box nền chính
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF1A1A1A), RoundedCornerShape(20.dp))
                 .padding(16.dp)
-                .animateContentSize(), // Thêm hiệu ứng chuyển động mượt mà khi đổi view
+                .animateContentSize(),
             contentAlignment = Alignment.Center
         ) {
-            // 3. Hiển thị nội dung động dựa trên state
             when (currentView) {
                 DnaView.RADAR -> RadarChart(
                     dnaData = dnaProfile.genreDistribution,
@@ -186,11 +174,29 @@ private fun DnaViewButton(text: String, isSelected: Boolean, onClick: () -> Unit
     }
 }
 
+// Hàm helper để lấy emoji cờ từ mã quốc gia
+private fun getFlagEmoji(countryCode: String): String {
+    return when (countryCode.uppercase()) {
+        "VN" -> "🇻🇳"
+        "US_UK" -> "🇬🇧/🇺🇸" // Giữ nguyên cách xử lý US_UK như trong code cũ
+        "JP" -> "🇯🇵"
+        "KR" -> "🇰🇷"
+        "CN" -> "🇨🇳"
+        "US" -> "🇺🇸" // Thêm US riêng
+        "GB" -> "🇬🇧" // Thêm GB riêng
+        else -> "🌍"
+    }
+}
+
 /**
- * Composable tái sử dụng để hiển thị danh sách Top 5 (Nghệ sĩ hoặc Quốc gia).
+ * •Composable tái sử dụng để hiển thị danh sách Top 5 (Nghệ sĩ hoặc Quốc gia).
+ * •PHIÊN BẢN HOÀN CHỈNH VÀ ĐÃ SỬA LỖI.
  */
 @Composable
 private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
+    // Xác định xem đây là danh sách nghệ sĩ hay quốc gia
+    val isArtistList = title.contains("Artists")
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start
@@ -202,25 +208,98 @@ private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
             fontSize = 18.sp,
             modifier = Modifier.padding(bottom = 12.dp)
         )
-        // Nếu không có dữ liệu, hiển thị thông báo
-        if (items.isEmpty()){
+        if (items.isEmpty()) {
             Text(
                 "Not enough data yet.",
                 color = Color.Gray,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp)
             )
         } else {
-            items.forEachIndexed { index, item ->
-                Text(
-                    text = "${index + 1}. ${item.first} (${item.second} songs)",
-                    color = Color.Gray,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items.forEach { item ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Thêm Icon hoặc Emoji ở đầu
+                        if (isArtistList) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = "Artist",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Text(text = getFlagEmoji(item.first), fontSize = 20.sp)
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Tên chính (không cần số thứ tự nữa)
+                        Text(
+                            text = item.first,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            // Thêm weight(1f) để Text này chiếm hết không gian còn lại (tránh tràn)
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Spacer(modifier = Modifier.weight(1f)) // Đã di chuyển weight(1f) vào Text trên để đảm bảo nó không đẩy Text sang phải
+
+                        // Số lượng
+                        Text(
+                            text = "${item.second} songs",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.End // Căn phải số lượng
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+// Đặt ở đâu đó trong file ProfileScreen.kt
+@Composable
+fun SharableDnaImage(dnaProfile: MusicDnaProfile, user: User) {
+    Column(
+        modifier = Modifier
+            .size(width = 400.dp, height = 700.dp) // Kích thước cố định
+            .background(Color(0xFF121212)) // Nền tối
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 1. Header
+        Text("Music DNA của ${user.name}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 2. Biểu đồ Radar
+        RadarChart(
+            dnaData = dnaProfile.genreDistribution,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 3. Top Lists
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                TopItemsList(title = "Top Artists", items = dnaProfile.topArtists)
+            }
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                TopItemsList(title = "Top Markets", items = dnaProfile.topCountries)
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f)) // Đẩy footer xuống dưới
+
+        // 4. Footer
+        Text("Tạo bởi Music DNA App", color = Color.Gray, fontSize = 12.sp)
     }
 }
 
