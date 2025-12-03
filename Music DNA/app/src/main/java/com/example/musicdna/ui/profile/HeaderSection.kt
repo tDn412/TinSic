@@ -1,5 +1,6 @@
 package com.example.musicdna.ui.profile
 
+// ... các import khác
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +27,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.musicdna.model.User
 
 @Composable
-fun HeaderSection() {
+fun HeaderSection(
+    user: User, // Nhận vào đối tượng User
+    onEditProfileClick: () -> Unit // Nhận vào một hàm callback
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
@@ -45,22 +50,30 @@ fun HeaderSection() {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(50.dp)
-            )
+            // Kiểm tra nếu avatarUrl là null thì dùng icon mặc định
+            if (user.avatarUrl == null) {
+                Icon(
+                    imageVector = Icons.Default.Person, // Icon mặc định
+                    contentDescription = "Default Avatar",
+                    tint = Color.White,
+                    modifier = Modifier.size(50.dp)
+                )
+            } else {
+                // TODO: Dùng thư viện Coil hoặc Glide để tải ảnh từ user.avatarUrl
+                // AsyncImage(model = user.avatarUrl, contentDescription = "User Avatar")
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Text("Alex Johnson", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("@alexmusic", color = Color.Gray, fontSize = 14.sp)
+        // Hiển thị tên từ đối tượng user
+        Text(user.name, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        // Bạn có thể tạo username từ email hoặc thêm một trường mới trong User model
+        Text("@${user.name.lowercase().replace(" ", "")}", color = Color.Gray, fontSize = 14.sp)
 
         Spacer(modifier = Modifier.height(12.dp))
         Button(
-            onClick = { /* Edit profile */ },
+            onClick = onEditProfileClick, // Gọi callback khi bấm nút
             shape = RoundedCornerShape(20.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
         ) {
