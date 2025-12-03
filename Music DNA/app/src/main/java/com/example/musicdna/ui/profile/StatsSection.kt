@@ -1,9 +1,10 @@
-package com.example.musicdna.ui
+package com.example.musicdna.ui.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope // Import RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,16 +25,17 @@ fun StatsSection() {
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        StatCard("1,247", "Songs Liked", Color(0xFF8B1FA0))
-        StatCard("89", "Parties Joined", Color(0xFF0D47A1))
+        // Apply the weight modifier here
+        StatCard("1,247", "Songs Liked", Color(0xFF8B1FA0), modifier = Modifier.weight(1f))
+        StatCard("89", "Parties Joined", Color(0xFF0D47A1), modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-fun StatCard(value: String, label: String, color: Color) {
+fun RowScope.StatCard(value: String, label: String, color: Color, modifier: Modifier = Modifier) {
+    // Use the passed-in modifier
     Column(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .padding(8.dp)
             .background(color.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
             .padding(20.dp),
