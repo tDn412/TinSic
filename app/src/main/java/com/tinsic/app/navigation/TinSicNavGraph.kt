@@ -136,6 +136,10 @@ fun TinSicNavGraph(
                     )
                 }
             }
+
+            composable(Screen.Karaoke.route) {
+                com.tinsic.app.presentation.karaoke.KaraokeScreen()
+            }
         }
     }
 }
