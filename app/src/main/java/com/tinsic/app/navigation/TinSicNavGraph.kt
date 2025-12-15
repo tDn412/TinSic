@@ -117,8 +117,23 @@ fun TinSicNavGraph(
                     onPlayerExpand = { showPlayer = true },
                     playerViewModel = playerViewModel
                 ) {
-                    PartyScreen()
+                    com.tinsic.app.presentation.party.PartyScreen(
+                        isRoomMode = false,
+                        onStartSession = {
+                            navController.navigate(Screen.PartyRoom.route)
+                        }
+                    )
                 }
+            }
+
+            // Full screen Party Room (No Bottom Bar)
+            composable(Screen.PartyRoom.route) {
+                com.tinsic.app.presentation.party.PartyScreen(
+                     isRoomMode = true,
+                     onLeaveSession = {
+                         navController.popBackStack()
+                     }
+                )
             }
 
             composable(Screen.Profile.route) {
