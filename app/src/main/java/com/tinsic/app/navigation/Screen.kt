@@ -9,4 +9,5 @@ sealed class Screen(val route: String) {
     object Party : Screen("party")
     object Profile : Screen("profile")
     object Player : Screen("player")
+    object Karaoke : Screen("karaoke_screen") // Hidden route for now
 }
