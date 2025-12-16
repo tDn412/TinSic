@@ -41,15 +41,31 @@ fun PartyScreen(
     val queue by viewModel.queue.collectAsState() // Fixed: use queue
     val searchQuery by viewModel.searchQuery.collectAsState()
     val roomId by viewModel.roomId.collectAsState()
+    val roomType by viewModel.roomType.collectAsState()
 
-    // Force mode if entered directly
-    LaunchedEffect(isRoomMode) {
+    // Force mode if entered directly (Run ONCE on entry Only)
+    LaunchedEffect(Unit) {
         if (isRoomMode) {
             viewModel.setMode(PartyModeState.ROOM)
         } else {
-            viewModel.setMode(PartyModeState.LOBBY)
+            // Only set to LOBBY if not already in a specific state (preserve VM state if needed)
+            if (viewModel.mode.value != PartyModeState.ROOM) {
+                viewModel.setMode(PartyModeState.LOBBY)
+            }
         }
     }
+
+    // --- NAVIGATION LOGIC ---
+    // REMOVED: Conflicting navigation logic.
+    // PartyScreen will handle the transition locally via 'when(mode)'
+    // This prevents the 'State Loop' bug where Navigation Stack holds a stale ROOM state.
+    /*
+    LaunchedEffect(mode) {
+        if (mode == PartyModeState.ROOM && !isRoomMode) {
+             onStartSession() // Navigate to Immersive Screen (PartyRoom route)
+        }
+    }
+    */
 
     // Neon Gradient Background
     val mainGradient = Brush.verticalGradient(
@@ -66,26 +82,53 @@ fun PartyScreen(
     ) {
         when (mode) {
             PartyModeState.LOBBY -> {
+                val context = androidx.compose.ui.platform.LocalContext.current
                 LobbyScreen(
                     roomId = roomId,
                     users = users,
-                    onStartParty = onStartSession
+                    onStartParty = { type ->
+                        android.widget.Toast.makeText(context, "Starting $type Mode...", android.widget.Toast.LENGTH_SHORT).show()
+                        viewModel.startPartySession(type) 
+                    }
                 )
             }
             PartyModeState.ROOM -> {
-                ActivePartyRoom(
-                    roomId = roomId,
-                    users = users,
-                    stageUsers = stageUsers, // Pass stage users
-                    currentUser = currentUser, // Pass current user
-                    queue = queue,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                    onRemoveSong = { viewModel.removeSong(it) },
-                    onLeaveRoom = onLeaveSession,
-                    onToggleStage = { viewModel.toggleStageJoin() }, // Action to join/leave stage
-                    onStartSong = { /* Logic to start song */ }
-                )
+                // SWITCH UI BASED ON ROOM TYPE
+                if (roomType == "GAME") {
+                    // Placeholder for Game Team
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🎮 Game Room", color = Color.Green, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                            Text("ID: $roomId", color = Color.White)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = { viewModel.leaveRoom() }) {
+                                Text("Leave Game")
+                            }
+                        }
+                    }
+                } else {
+                    ActivePartyRoom(
+                        roomId = roomId,
+                        users = users,
+                        stageUsers = stageUsers, // Pass stage users
+                        currentUser = currentUser, // Pass current user
+                        queue = queue,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        onRemoveSong = { viewModel.removeSong(it) },
+                        onLeaveRoom = {
+                            // 1. Send Leave command to Firebase
+                            viewModel.leaveRoom()
+                            // 2. Navigate back
+                            onLeaveSession() 
+                        },
+                        onToggleStage = { viewModel.toggleStageJoin() }, // Action to join/leave stage
+                        onStartSong = { /* Logic to start song */ }
+                    )
+                }
             }
             else -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -105,8 +148,10 @@ fun PartyScreen(
 fun LobbyScreen(
     roomId: String,
     users: List<PartyUser>,
-    onStartParty: () -> Unit
+    onStartParty: (String) -> Unit
 ) {
+    var showTypeDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -195,7 +240,7 @@ fun LobbyScreen(
 
         // Start Button
         Button(
-            onClick = onStartParty,
+            onClick = { showTypeDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp),
@@ -215,6 +260,82 @@ fun LobbyScreen(
             ) {
                 Text("Start Party Session", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
+        }
+    }
+
+    if (showTypeDialog) {
+        AlertDialog(
+            onDismissRequest = { showTypeDialog = false },
+            containerColor = Color(0xFF222222),
+            title = {
+                Text("Select Party Type", color = Color.White, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // KARAOKE OPTION
+                    PartyTypeOption(
+                        title = "🎤 Karaoke",
+                        description = "Sing along with friends",
+                        color = Color(0xFFFF00FF),
+                        onClick = {
+                            showTypeDialog = false
+                            onStartParty("KARAOKE")
+                        }
+                    )
+                    
+                    // GAME OPTION (Disabled)
+                    PartyTypeOption(
+                        title = "🎮 Game Room",
+                        description = "Play mini-games (Coming Soon)",
+                        color = Color.Gray,
+                        isEnabled = false,
+                        onClick = {}
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTypeDialog = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun PartyTypeOption(
+    title: String,
+    description: String,
+    color: Color,
+    isEnabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF333333))
+            .clickable(enabled = isEnabled, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(title.first().toString(), fontSize = 24.sp) // Emoji or Initial
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = if (isEnabled) Color.White else Color.Gray, fontWeight = FontWeight.Bold)
+            Text(description, color = Color.Gray, fontSize = 12.sp)
+        }
+        if (!isEnabled) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
         }
     }
 }

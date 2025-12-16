@@ -29,7 +29,8 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun provideFirebaseRealtimeDatabase(): FirebaseDatabase {
-        return FirebaseDatabase.getInstance()
+        // Explicitly set the URL because google-services.json might be missing it, and region is asia-southeast1
+        return FirebaseDatabase.getInstance("https://tinsic-default-rtdb.asia-southeast1.firebasedatabase.app/")
     }
 
     @Provides
