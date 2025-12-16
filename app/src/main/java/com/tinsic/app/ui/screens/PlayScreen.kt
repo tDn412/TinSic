@@ -22,14 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.tinsic.app.game.model.GameType
 import com.tinsic.app.game.model.Question
@@ -58,7 +53,6 @@ fun PauseIcon(modifier: Modifier = Modifier, tint: Color = Color.White) {
     }
 }
 
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun PlayScreen(
     uiState: GameUiState,
@@ -69,46 +63,16 @@ fun PlayScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0f) }
 
-    // --- CẤU HÌNH EXOPLAYER TỐI ƯU ---
+    // SIMPLE ExoPlayer - Same as AppModule (no complex config to avoid distortion)
     val exoPlayer = remember {
-        // Cấu hình LoadControl để tăng buffer và giảm hiện tượng rè
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                15000,  // minBufferMs - buffer tối thiểu trước khi phát
-                50000,  // maxBufferMs - buffer tối đa
-                2500,   // bufferForPlaybackMs - buffer cần để bắt đầu phát
-                5000    // bufferForPlaybackAfterRebufferMs - buffer sau khi rebuffer
-            )
-            .build()
-        
-        // Cấu hình RenderersFactory để tối ưu hóa audio rendering
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-        
         ExoPlayer.Builder(context)
-            .setLoadControl(loadControl)
-            .setRenderersFactory(renderersFactory)
-            .setWakeMode(C.WAKE_MODE_LOCAL)  // Keep CPU awake for smooth playback
             .build()
             .apply {
-                // Cấu hình AudioAttributes cho chất lượng cao
-                val audioAttributes = AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build()
-                setAudioAttributes(audioAttributes, true)
-                
-                // Tắt skip silence để tránh hiện tượng rè
-                skipSilenceEnabled = false
-                
-                // Set volume ổn định ở mức vừa phải
-                volume = 0.8f  // Giảm từ 1.0 xuống 0.8 để tránh clipping
+                volume = 0.8f  // Prevent clipping
                 
                 addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e("LinkBeatMusic", "Lỗi phát nhạc: ${error.message}")
-                        Log.e("LinkBeatMusic", "Error code: ${error.errorCode}")
+                        Log.e("GamePlayScreen", "Error: ${error.message}")
                     }
                     
                     override fun onIsPlayingChanged(playing: Boolean) {

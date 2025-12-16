@@ -17,18 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import com.tinsic.app.game.model.Question
 
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun MusicPreviewScreen(
     currentQuestion: Question?,
@@ -38,52 +31,20 @@ fun MusicPreviewScreen(
     val context = LocalContext.current
     var currentPosition by remember { mutableStateOf(0f) }
 
-    // --- CẤU HÌNH EXOPLAYER TỐI ƯU ---
+    // SIMPLE ExoPlayer - Same config as AppModule
     val exoPlayer = remember {
-        // Cấu hình LoadControl để tăng buffer và giảm hiện tượng rè
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                15000,  // minBufferMs - buffer tối thiểu trước khi phát
-                50000,  // maxBufferMs - buffer tối đa
-                2500,   // bufferForPlaybackMs - buffer cần để bắt đầu phát
-                5000    // bufferForPlaybackAfterRebufferMs - buffer sau khi rebuffer
-            )
-            .build()
-        
-        // Cấu hình RenderersFactory để tối ưu hóa audio rendering
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-        
         ExoPlayer.Builder(context)
-            .setLoadControl(loadControl)
-            .setRenderersFactory(renderersFactory)
-            .setWakeMode(C.WAKE_MODE_LOCAL)  // Keep CPU awake
             .build()
             .apply {
-                // Cấu hình AudioAttributes cho chất lượng cao
-                val audioAttributes = AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build()
-                setAudioAttributes(audioAttributes, true)
-                
-                // Tắt skip silence để tránh hiện tượng rè
-                skipSilenceEnabled = false
-                
-                // Set volume ổn định
-                volume = 0.8f
+                volume = 0.8f  // Prevent clipping
                 
                 addListener(object : Player.Listener {
-                    override fun onPlayerError(error: PlaybackException) {
-                        Log.e("LinkBeatMusic", "Lỗi phát nhạc: ${error.message}")
-                        Log.e("LinkBeatMusic", "Error code: ${error.errorCode}")
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        Log.e("MusicPreview", "Error: ${error.message}")
                     }
                     
                     override fun onPlaybackStateChanged(playbackState: Int) {
-                        // Khi nhạc phát xong (STATE_ENDED), gọi callback
                         if (playbackState == Player.STATE_ENDED) {
-                            Log.d("LinkBeatMusic", "Nhạc phát xong, chuyển màn hình")
                             onMusicFinished()
                         }
                     }
@@ -106,20 +67,16 @@ fun MusicPreviewScreen(
             try {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
-                // Use musicUrl if available (for LYRICS_FLIP), otherwise use content
                 val audioUrl = currentQuestion.musicUrl ?: currentQuestion.content
-                // Create MediaItem WITHOUT clipping - play the entire pre-cut audio file
-                val mediaItem = MediaItem.Builder()
-                    .setUri(audioUrl)
-                    .build()
+                val mediaItem = MediaItem.fromUri(audioUrl)
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
                 currentPosition = 0f
                 
-                Log.d("LinkBeatMusic", "Phát nhạc: $audioUrl")
+                Log.d("MusicPreview", "Playing: $audioUrl")
             } catch (e: Exception) {
-                Log.e("LinkBeatMusic", "Lỗi khi phát nhạc: ${e.message}")
+                Log.e("MusicPreview", "Error loading: ${e.message}")
                 e.printStackTrace()
             }
         }
@@ -129,7 +86,7 @@ fun MusicPreviewScreen(
         onDispose { exoPlayer.release() }
     }
 
-    // Background
+    // UI
     val brush = Brush.verticalGradient(
         colors = listOf(Color(0xFF2E003E), Color(0xFF000000))
     )
@@ -144,7 +101,7 @@ fun MusicPreviewScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
-            // Music Icon with pulsing effect
+            // Music Icon
             Box(
                 modifier = Modifier
                     .size(150.dp)
@@ -192,7 +149,6 @@ fun MusicPreviewScreen(
             Column(
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
-                // Sử dụng thời lượng thực tế của file âm thanh thay vì hardcode 10 giây
                 val duration = if (exoPlayer.duration > 0) exoPlayer.duration.toFloat() else 1f
                 val progress = if (duration > 0) currentPosition / duration else 0f
 
