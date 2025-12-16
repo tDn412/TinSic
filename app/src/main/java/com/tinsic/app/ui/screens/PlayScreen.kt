@@ -186,7 +186,7 @@ fun PlayScreen(
                 // Circular Timer
                 Box(contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
-                        progress = { uiState.timeLeft / 10f },
+                        progress = uiState.timeLeft / 10f,
                         modifier = Modifier.size(50.dp),
                         color = if (uiState.timeLeft < 4) Color.Red else Color.Green,
                         trackColor = Color.Gray.copy(alpha = 0.3f),
@@ -284,7 +284,7 @@ fun PlayScreen(
                                         val cappedPosition = currentPosition.coerceAtMost(10000f); val progress = if (duration > 0) cappedPosition / duration else 0f
                                         
                                         LinearProgressIndicator(
-                                            progress = { progress.coerceIn(0f, 1f) },
+                                            progress = progress.coerceIn(0f, 1f),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(4.dp)

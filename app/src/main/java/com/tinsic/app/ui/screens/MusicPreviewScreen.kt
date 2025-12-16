@@ -195,7 +195,7 @@ fun MusicPreviewScreen(
                 val progress = if (duration > 0) currentPosition / duration else 0f
 
                 LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
+                    progress = progress.coerceIn(0f, 1f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)
