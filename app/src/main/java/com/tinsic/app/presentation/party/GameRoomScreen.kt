@@ -45,9 +45,9 @@ fun GameRoomScreen(
         gameViewModel.setPlayers(partyUsers, currentUser.id)
     }
     
-    // Pause music when entering Game Room to avoid conflicts
+    // Stop music and hide MiniPlayer when entering Game Room
     LaunchedEffect(Unit) {
-        playerViewModel.pause()
+        playerViewModel.stopAndClear()  // This will hide MiniPlayer completely
     }
 
     // Gradient Background matching Party theme

@@ -291,6 +291,18 @@ class PlayerViewModel @Inject constructor(
         exoPlayer.seekTo(position)
         _currentPosition.value = position
     }
+    
+    /**
+     * Stop playback and clear current song (hides MiniPlayer)
+     * Use this when entering Game Room or other contexts where player should be hidden
+     */
+    fun stopAndClear() {
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        _currentSong.value = null
+        _isPlaying.value = false
+        historyTrackingJob?.cancel()
+    }
 
     fun playNext() {
         if (_playlist.value.isEmpty()) return
