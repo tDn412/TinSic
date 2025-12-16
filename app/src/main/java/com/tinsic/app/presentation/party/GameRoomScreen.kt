@@ -45,6 +45,14 @@ fun GameRoomScreen(
         gameViewModel.setPlayers(partyUsers, currentUser.id)
     }
     
+    // Set roomId for Firebase sync
+    LaunchedEffect(roomId) {
+        if (roomId.isNotEmpty()) {
+            gameViewModel.setRoomId(roomId)
+            android.util.Log.d("GameRoomScreen", "Set roomId in GameViewModel: $roomId")
+        }
+    }
+    
     // Stop music and hide MiniPlayer when entering Game Room
     DisposableEffect(Unit) {
         android.util.Log.d("GameRoomScreen", "Stopping music and clearing MiniPlayer")

@@ -35,23 +35,49 @@ data class GameUiState(
     val error: String? = null  // Error message if loading fails
 )
 
-class GameViewModel : ViewModel() {
+@dagger.hilt.android.lifecycle.HiltViewModel
+class GameViewModel @javax.inject.Inject constructor(
+    private val gameRepository: GameRepository,
+    private val partyRepository: com.tinsic.app.data.repository.PartyRepository
+) : ViewModel() {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState = _uiState.asStateFlow()
     
-    private val repository = GameRepository()
+    var currentQuestion: Question? = null
+        private set
     
-    // Real players will be injected from PartyViewModel
-    private var realPlayers: List<com.tinsic.app.presentation.party.PartyUser> = emptyList()
+    // Track current player ID and room ID for Firebase sync
     private var currentPlayerId: String = ""
+    private var currentRoomId: String = ""
     
     /**
      * Inject real players from PartyViewModel
      * Call this BEFORE selectGame()
      */
     fun setPlayers(players: List<com.tinsic.app.presentation.party.PartyUser>, currentUserId: String) {
-        realPlayers = players
         currentPlayerId = currentUserId
+        currentRoomId = "" // Will be set separately
+        
+        // Convert PartyUser to PlayerScore
+        val playerScores = players.map { p ->
+            PlayerScore(
+                playerId = p.id,
+                name = p.name,
+                score = p.score,
+                answeredCorrectly = false
+            )
+        }
+        _uiState.value = _uiState.value.copy(playerScores = playerScores)
+        android.util.Log.d("GameViewModel", "Players set: ${players.size}, currentUser: $currentUserId")
+    }
+    
+    /**
+     * Set room ID for Firebase sync
+     * Called from GameRoomScreen after PartyViewModel provides roomId
+     */
+    fun setRoomId(roomId: String) {
+        currentRoomId = roomId
+        android.util.Log.d("GameViewModel", "RoomId set: $roomId")
     }
 
     fun selectGame(type: GameType) {
@@ -64,7 +90,7 @@ class GameViewModel : ViewModel() {
             
             try {
                 // Fetch questions from Firebase
-                val allQuestions = repository.getQuestionsByType(type)
+                val allQuestions = gameRepository.getQuestionsByType(type)
                 val filteredQuestions = allQuestions.shuffled().take(5)
                 
                 if (filteredQuestions.isEmpty()) {
@@ -75,16 +101,20 @@ class GameViewModel : ViewModel() {
                     return@launch
                 }
 
-                // Initialize player scores from real connected players
-                val initialPlayerScores = realPlayers.map { partyUser ->
-                    PlayerScore(
-                        playerId = partyUser.id,
-                        playerName = partyUser.name,
-                        score = 0,
-                        answeredCorrectly = false,
-                        isCurrentPlayer = partyUser.id == currentPlayerId
+
+                // Initialize player scores from already-set players (via setPlayers)
+                val initialPlayerScores = _uiState.value.playerScores.ifEmpty {
+                    // Fallback if setPlayers wasn't called
+                    listOf(
+                        PlayerScore(
+                            playerId = currentPlayerId,
+                            playerName = "You",
+                            score = 0,
+                            answeredCorrectly = false,
+                            isCurrentPlayer = true
+                        )
                     )
-                }.sortedByDescending { it.score }
+                }
 
                 _uiState.value = _uiState.value.copy(
                     selectedGameType = type,
@@ -256,6 +286,16 @@ class GameViewModel : ViewModel() {
             mockPlayers = emptyList(), // No more AI players
             playerScores = updatedPlayerScores
         )
+        
+        // === FIREBASE SYNC: Update score in Realtime Database ===
+        if (currentRoomId.isNotEmpty() && currentPlayerId.isNotEmpty()) {
+            viewModelScope.launch {
+                partyRepository.updatePlayerScore(currentRoomId, currentPlayerId, newScore)
+                android.util.Log.d("GameViewModel", "Synced score to Firebase: $newScore")
+            }
+        } else {
+            android.util.Log.w("GameViewModel", "Cannot sync score - roomId or playerId empty")
+        }
 
         viewModelScope.launch {
             delay(2000)
