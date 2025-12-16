@@ -175,7 +175,6 @@ class PartyViewModel @Inject constructor(
                         }
                     }
                 }
->>>>>>> origin/main
             }
         }
     }
