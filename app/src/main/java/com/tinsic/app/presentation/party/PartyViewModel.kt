@@ -159,6 +159,26 @@ class PartyViewModel @Inject constructor(
         }
     }
 
+    fun joinRoom(roomIdInput: String, onResult: (Boolean) -> Unit) {
+        if (roomIdInput.isBlank()) return
+        
+        viewModelScope.launch {
+            val user = _currentUser.value
+            val result = partyRepository.joinPartyRoom(roomIdInput, user.id, user.name)
+            
+            if (result.isSuccess) {
+                Log.d("PartyVM", "Join Success: $roomIdInput")
+                _roomId.value = roomIdInput
+                _mode.value = PartyModeState.ROOM
+                subscribeToRoom(roomIdInput)
+                onResult(true)
+            } else {
+                Log.e("PartyVM", "Join Failed: ${result.exceptionOrNull()}")
+                onResult(false)
+            }
+        }
+    }
+
     fun setMode(newMode: PartyModeState) {
         _mode.value = newMode
     }

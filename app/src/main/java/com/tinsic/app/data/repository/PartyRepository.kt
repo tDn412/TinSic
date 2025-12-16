@@ -65,7 +65,15 @@ class PartyRepository @Inject constructor(
 
     suspend fun joinPartyRoom(roomId: String, userId: String, userName: String): Result<Unit> {
         return try {
-            // Random Color & Avatar for Guest
+            val roomRef = realtimeDb.getReference("parties").child(roomId)
+            
+            // 1. Check if room exists first
+            val snapshot = roomRef.get().await()
+            if (!snapshot.exists()) {
+                return Result.failure(Exception("Room ID $roomId not found"))
+            }
+
+            // 2. Random Color & Avatar for Guest
             val randomColor = listOf(0xFF3B82F6, 0xFF8B5CF6, 0xFF10B981, 0xFFF59E0B).random()
             val randomAvatar = listOf("🐼", "🦁", "🐨", "🐸", "🐙").random()
 
@@ -77,8 +85,9 @@ class PartyRepository @Inject constructor(
                 color = randomColor,
                 joinedAt = System.currentTimeMillis()
             )
-            realtimeDb.getReference("parties").child(roomId)
-                .child("members").child(userId).setValue(member).await()
+            
+            // 3. Add to members list
+            roomRef.child("members").child(userId).setValue(member).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

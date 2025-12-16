@@ -89,6 +89,13 @@ fun PartyScreen(
                     onStartParty = { type ->
                         android.widget.Toast.makeText(context, "Starting $type Mode...", android.widget.Toast.LENGTH_SHORT).show()
                         viewModel.startPartySession(type) 
+                    },
+                    onJoinParty = { inputId ->
+                        viewModel.joinRoom(inputId) { success ->
+                             if (!success) {
+                                 android.widget.Toast.makeText(context, "Room not found!", android.widget.Toast.LENGTH_SHORT).show()
+                             }
+                        }
                     }
                 )
             }
@@ -148,9 +155,11 @@ fun PartyScreen(
 fun LobbyScreen(
     roomId: String,
     users: List<PartyUser>,
-    onStartParty: (String) -> Unit
+    onStartParty: (String) -> Unit,
+    onJoinParty: (String) -> Unit
 ) {
     var showTypeDialog by remember { mutableStateOf(false) }
+    var inputRoomId by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -237,6 +246,40 @@ fun LobbyScreen(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // JOIN ROOM SECTION
+        Text("Join Existing Room", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = inputRoomId,
+                onValueChange = { if (it.length <= 4) inputRoomId = it },
+                placeholder = { Text("Enter ID (4 digits)", color = Color.Gray) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF00FFFF),
+                    unfocusedBorderColor = Color.Gray,
+                    focusedTextColor = Color(0xFF00FFFF), // Updated from inputTextColor
+                    unfocusedTextColor = Color.White      // Updated from inputTextColor
+                )
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Button(
+                onClick = { onJoinParty(inputRoomId) },
+                enabled = inputRoomId.length == 4,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333)),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.height(56.dp)
+            ) {
+                Text("JOIN", color = Color.White)
+            }
+        }
+
+        // Divide
+        Divider(color = Color.Gray, thickness = 1.dp, modifier = Modifier.padding(bottom = 24.dp))
 
         // Start Button
         Button(
