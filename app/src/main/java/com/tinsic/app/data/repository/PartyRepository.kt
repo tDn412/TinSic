@@ -233,4 +233,96 @@ class PartyRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    // --- GAME SESSION SYNC ---
+    
+    /**
+     * Listen to game session updates in real-time
+     * Called by ALL players to stay in sync
+     */
+    fun observeGameSession(roomId: String): Flow<com.tinsic.app.data.model.GameSession?> = callbackFlow {
+        val reference = realtimeDb.getReference("parties").child(roomId).child("gameSession")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val session = snapshot.getValue(com.tinsic.app.data.model.GameSession::class.java)
+                trySend(session)
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                trySend(null)
+            }
+        }
+        reference.addValueEventListener(listener)
+        awaitClose { reference.removeEventListener(listener) }
+    }
+    
+    /**
+     * Start a new game session (HOST ONLY)
+     * Creates initial game state with shuffled questions
+     */
+    suspend fun startGameSession(
+        roomId: String,
+        hostId: String,
+        gameType: String,
+        questionIds: List<String>
+    ): Result<Unit> {
+        return try {
+            val session = com.tinsic.app.data.model.GameSession(
+                gameType = gameType,
+                isActive = true,
+                hostId = hostId,
+                currentQuestionIndex = 0,
+                timeLeft = 5,  // Countdown
+                phase = "COUNTDOWN",
+                questionIds = questionIds.shuffled(),  // Same order for all players
+                startedAt = System.currentTimeMillis(),
+                countdownStartedAt = System.currentTimeMillis(),
+                questionStartedAt = 0
+            )
+            
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").setValue(session).await()
+            
+            android.util.Log.d("PartyRepo", "Started game session: $gameType")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to start game session: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Update game session phase (HOST ONLY)
+     */
+    suspend fun updateGamePhase(roomId: String, phase: String, additionalUpdates: Map<String, Any> = emptyMap()): Result<Unit> {
+        return try {
+            val updates = mutableMapOf<String, Any>("phase" to phase)
+            updates.putAll(additionalUpdates)
+            
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").updateChildren(updates).await()
+            
+            android.util.Log.d("PartyRepo", "Updated game phase: $phase")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update game phase: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * End game session (HOST ONLY)
+     */
+    suspend fun endGameSession(roomId: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").removeValue().await()
+            
+            android.util.Log.d("PartyRepo", "Ended game session")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to end game session: ${e.message}")
+            Result.failure(e)
+        }
+    }
 }
