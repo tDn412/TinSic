@@ -107,6 +107,15 @@ class GameViewModel @javax.inject.Inject constructor(
             partyRepository.observeGameSession(currentRoomId).collect { session ->
                 if (session != null && session.isActive) {
                     handleGameSessionUpdate(session)
+                } else if (session == null || !session.isActive) {
+                    // Session ended (host left or game over)
+                    if (!isHost && _uiState.value.currentScreen != GameScreenState.MENU) {
+                        android.util.Log.d("GameViewModel", "CLIENT: Session ended, returning to menu")
+                        _uiState.value = _uiState.value.copy(
+                            currentScreen = GameScreenState.MENU,
+                            error = "Host đã kết thúc game"
+                        )
+                    }
                 }
             }
         }
@@ -595,5 +604,15 @@ class GameViewModel @javax.inject.Inject constructor(
                 }
             }
         }
+    }
+    
+    /**
+     * Cleanup when leaving game room
+     * Cancel all observers to prevent memory leaks
+     */
+    override fun onCleared() {
+        super.onCleared()
+        gameSessionObserverJob?.cancel()
+        android.util.Log.d("GameViewModel", "ViewModel cleared, observers cancelled")
     }
 }
