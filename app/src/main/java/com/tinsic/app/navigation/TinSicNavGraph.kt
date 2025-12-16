@@ -221,7 +221,12 @@ fun MainScaffold(
             hiltViewModel()
         } else null
     
-    val partyMode by (partyViewModel?.mode ?: remember { mutableStateOf(com.tinsic.app.presentation.party.PartyModeState.LOBBY) }).collectAsState()
+    // Collect party mode if partyViewModel exists, otherwise default to LOBBY
+    val partyMode = if (partyViewModel != null) {
+        partyViewModel.mode.collectAsState().value
+    } else {
+        com.tinsic.app.presentation.party.PartyModeState.LOBBY
+    }
     
     // Hide MiniPlayer when in Party Room mode
     val showMiniPlayer = !(currentRoute == Screen.Party.route && partyMode == com.tinsic.app.presentation.party.PartyModeState.ROOM)
