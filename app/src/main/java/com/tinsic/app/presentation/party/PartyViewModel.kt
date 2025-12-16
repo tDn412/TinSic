@@ -94,11 +94,15 @@ class PartyViewModel @Inject constructor(
                     Log.d("PartyVM", "[SimulateDownload] Current User: ${_currentUser.value.id}, Room: ${_roomId.value}")
                     kotlinx.coroutines.delay(3000) // Simulate MP3/JSON download
                     Log.d("PartyVM", "[SimulateDownload] Resource loaded! Setting ready...")
-                    val result = partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
-                    if (result.isSuccess) {
-                        Log.d("PartyVM", "[SimulateDownload] ✅ Ready state updated successfully!")
-                    } else {
-                        Log.e("PartyVM", "[SimulateDownload] ❌ Failed to update ready state: ${result.exceptionOrNull()}")
+                    
+                    // Fire and forget - don't wait for Firebase confirmation
+                    viewModelScope.launch {
+                        val result = partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
+                        if (result.isSuccess) {
+                            Log.d("PartyVM", "[SimulateDownload] ✅ Ready state updated successfully!")
+                        } else {
+                            Log.e("PartyVM", "[SimulateDownload] ❌ Failed to update ready state: ${result.exceptionOrNull()}")
+                        }
                     }
                 }
             }
