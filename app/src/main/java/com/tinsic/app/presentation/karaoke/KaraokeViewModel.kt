@@ -2,7 +2,8 @@ package com.tinsic.app.presentation.karaoke
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tinsic.app.domain.repository.KaraokeRepository
+import com.tinsic.app.domain.karaoke.model.LyricLine
+import com.tinsic.app.domain.karaoke.model.SongNote
 import com.tinsic.app.presentation.karaoke.engine.KaraokeEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -15,7 +16,6 @@ import javax.inject.Inject
 
 @HiltViewModel
 class KaraokeViewModel @Inject constructor(
-    private val repository: KaraokeRepository,
     private val karaokeEngine: KaraokeEngine
 ) : ViewModel() {
 
@@ -102,24 +102,12 @@ class KaraokeViewModel @Inject constructor(
         }
     }
 
-    fun toggleRecording() {
-        val currentState = _uiState.value
-        if (currentState.isRecording) {
-            stopSinging()
-        } else {
-            startSinging()
-        }
-    }
-
-    private fun startSinging() {
+    fun startSinging(notes: List<SongNote>, lyrics: List<LyricLine>) {
         _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
         viewModelScope.launch {
             pitchBuffer.clear()
-            // HARDCODED SONG for demo purpose, in future logic this comes from arguments
-            val notes = repository.getSongNotes("PhiaSauMotCoGai.json")
-            val lyrics = repository.getLyrics("PhiaSauMotCoGai.lrc")
-
+            
             _uiState.update {
                 it.copy(
                     isRecording = true,
