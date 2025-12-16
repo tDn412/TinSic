@@ -297,11 +297,13 @@ class PlayerViewModel @Inject constructor(
      * Use this when entering Game Room or other contexts where player should be hidden
      */
     fun stopAndClear() {
+        android.util.Log.d("PlayerViewModel", "stopAndClear() called")
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         _currentSong.value = null
         _isPlaying.value = false
         historyTrackingJob?.cancel()
+        android.util.Log.d("PlayerViewModel", "currentSong cleared: ${_currentSong.value}")
     }
 
     fun playNext() {

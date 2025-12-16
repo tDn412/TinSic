@@ -46,8 +46,13 @@ fun GameRoomScreen(
     }
     
     // Stop music and hide MiniPlayer when entering Game Room
-    LaunchedEffect(Unit) {
-        playerViewModel.stopAndClear()  // This will hide MiniPlayer completely
+    DisposableEffect(Unit) {
+        android.util.Log.d("GameRoomScreen", "Stopping music and clearing MiniPlayer")
+        playerViewModel.stopAndClear()
+        
+        onDispose {
+            android.util.Log.d("GameRoomScreen", "GameRoomScreen disposed")
+        }
     }
 
     // Gradient Background matching Party theme
