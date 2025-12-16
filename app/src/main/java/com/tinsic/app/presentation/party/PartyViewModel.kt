@@ -80,12 +80,12 @@ class PartyViewModel @Inject constructor(
                         // Update current user with real data
                         _currentUser.value = PartyUser(
                             id = userId,
-                            name = user.name,
+                            name = user.displayName,  // Fixed: displayName instead of name
                             avatar = "👤", // Default avatar, can customize later
                             color = Color(0xFF1DB954), // Spotify green
                             score = 0
                         )
-                        android.util.Log.d("PartyVM", "Loaded user: ${user.name}")
+                        android.util.Log.d("PartyVM", "Loaded user: ${user.displayName}")
                     }
                 }
             } else {
