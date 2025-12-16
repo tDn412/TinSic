@@ -15,3 +15,6 @@ val NeonPink = Color(0xFFFF006E)
 val NeonPurple = Color(0xFF8B5CF6)
 val NeonCyan = Color(0xFF00E5FF)
 val NeonGreen = Color(0xFF10B981)
+
+// UI Surface colors
+val CardBackground = Color(0xFF1E1E1E)
