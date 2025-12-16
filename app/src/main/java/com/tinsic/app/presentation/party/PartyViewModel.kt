@@ -123,12 +123,13 @@ class PartyViewModel @Inject constructor(
                 }
                 if (_playbackState.value != "LOADING") return@combine // Not in loading state
 
-                // Calculate required ready count: stage members + host
-                val requiredCount = stage.size + 1 // Host + stage performers
+                // Calculate required ready count: ALL people on stage (including host if on stage)
+                val requiredCount = stage.size // Just count stage members (host is included if on stage)
                 val readyCount = ready.values.count { it }
 
                 Log.d("PartyVM", "[HostControl] Ready: $readyCount/$requiredCount (Stage: ${stage.size})")
                 Log.d("PartyVM", "[HostControl] Ready State: $ready")
+                Log.d("PartyVM", "[HostControl] Stage Users: ${stage.map { it.id }}")
 
                 if (readyCount >= requiredCount && requiredCount > 0) {
                     Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
