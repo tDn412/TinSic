@@ -307,18 +307,20 @@ class PartyViewModel @Inject constructor(
                 // Update current user so they have Crown avatar locally if needed
                 _currentUser.value = host.copy(avatar = "👑", color = Color(0xFFEC4899))
                 
-                // AUTO-ADD DEMO SONG: "Phía Sau Một Cô Gái" để test sync engine
-                val demoSong = com.tinsic.app.data.model.QueueSong(
-                    id = "",
-                    title = "Phía Sau Một Cô Gái",
-                    artist = "Soobin Hoàng Sơn",
-                    coverUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media", // Placeholder
-                    audioUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media",
-                    addedByUserId = host.id,
-                    addedByUserName = host.name,
-                    timestamp = System.currentTimeMillis()
-                )
-                partyRepository.addSongToQueue(currentRoomId, demoSong)
+                // AUTO-ADD DEMO SONG (DEBUG ONLY): "Phía Sau Một Cô Gái" để test sync engine
+                if (com.tinsic.app.BuildConfig.DEBUG) {
+                    val demoSong = com.tinsic.app.data.model.QueueSong(
+                        id = "",
+                        title = "Phía Sau Một Cô Gái",
+                        artist = "Soobin Hoàng Sơn",
+                        coverUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media",
+                        audioUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media",
+                        addedByUserId = host.id,
+                        addedByUserName = host.name,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    partyRepository.addSongToQueue(currentRoomId, demoSong)
+                }
             } else {
                 Log.e("PartyDebug", "FIREBASE ERROR: ${result.exceptionOrNull()}")
             }
@@ -462,8 +464,8 @@ class PartyViewModel @Inject constructor(
     // Start the song (move from queue to current + trigger LOADING state)
     fun startSong(songId: String) {
         viewModelScope.launch {
-            // Clear all ready states
-            partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, false)
+            // Clear ALL ready states from previous song
+            partyRepository.clearAllReadyStates(_roomId.value)
             // Transition to LOADING
             partyRepository.updatePlaybackState(_roomId.value, "LOADING", 0L)
             // Update current song

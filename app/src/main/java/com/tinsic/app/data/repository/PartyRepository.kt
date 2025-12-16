@@ -133,7 +133,8 @@ class PartyRepository @Inject constructor(
         }
     }
 
-    suspend fun updatePlaybackState(roomId: String, isPlaying: Boolean): Result<Unit> {
+    // Deprecated: Old boolean-based playing flag (kept for backward compatibility)
+    suspend fun updatePlayingFlag(roomId: String, isPlaying: Boolean): Result<Unit> {
         return try {
             realtimeDb.getReference("parties").child(roomId)
                 .child("isPlaying").setValue(isPlaying).await()
@@ -143,7 +144,7 @@ class PartyRepository @Inject constructor(
         }
     }
 
-    // New: Update playback state machine (for sync engine)
+    // Update playback state machine (for sync engine)
     suspend fun updatePlaybackState(roomId: String, state: String, startTime: Long = 0L): Result<Unit> {
         return try {
             val updates = mapOf(
@@ -157,7 +158,18 @@ class PartyRepository @Inject constructor(
         }
     }
 
-    // New: Set member ready state (resource loaded)
+    // Clear all ready states (called when starting new song)
+    suspend fun clearAllReadyStates(roomId: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("status/readyState").removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Set member ready state (resource loaded)
     suspend fun setMemberReady(roomId: String, userId: String, isReady: Boolean): Result<Unit> {
         return try {
             realtimeDb.getReference("parties").child(roomId)
