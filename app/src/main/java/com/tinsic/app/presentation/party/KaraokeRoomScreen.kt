@@ -324,7 +324,9 @@ fun ActivePartyRoom(
                             serverTimeOffset = 0L // Will be updated by Firebase
                         }
                         
-                        LaunchedEffect(startTime) {
+                        // Trigger countdown when playbackState becomes COUNTDOWN
+                        LaunchedEffect(playbackState) {  // Changed from startTime to playbackState
+                            if (playbackState != "COUNTDOWN") return@LaunchedEffect
                             if (startTime == 0L) return@LaunchedEffect
                             
                             val receivedAt = System.currentTimeMillis()
@@ -341,7 +343,7 @@ fun ActivePartyRoom(
                                 
                                 timeLeft = remaining.coerceAtLeast(0)
                                 
-                                if (remaining in 1..5) {  // Only log countdown numbers
+                                if (remaining in 1..10) {  // Log from 10 to 1
                                     android.util.Log.d("KaraokeUI", "[Countdown] $remaining (${remainingMs}ms remaining)")
                                 }
                                 
@@ -353,8 +355,11 @@ fun ActivePartyRoom(
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Only show countdown when ≤ 5 seconds (skip the 3s buffer)
+                            val displayTime = if (timeLeft > 5) 5 else timeLeft
+                            
                             Text(
-                                text = if (timeLeft > 0) "$timeLeft" else "GO!",
+                                text = if (displayTime > 0) "$displayTime" else "GO!",
                                 color = Color(0xFF00FFFF),
                                 fontSize = 120.sp,
                                 fontWeight = FontWeight.Black

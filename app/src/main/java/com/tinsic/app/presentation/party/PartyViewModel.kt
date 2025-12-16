@@ -137,11 +137,13 @@ class PartyViewModel @Inject constructor(
                     // Use Firebase Server Time for perfect sync across all devices
                     val serverTime = partyRepository.getServerTime()
                     val localTime = System.currentTimeMillis()
-                    val countdownStart = serverTime + 5000
+                    // INCREASED BUFFER: 8s to ensure all devices receive startTime before countdown begins
+                    // UI will only show last 5 seconds
+                    val countdownStart = serverTime + 8000
                     
                     Log.d("PartyVM", "[HostControl] Local time: $localTime")
                     Log.d("PartyVM", "[HostControl] Server time: $serverTime (offset: ${serverTime - localTime}ms)")
-                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart")
+                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart (8s buffer)")
                     
                     partyRepository.updatePlaybackState(roomIdValue, "COUNTDOWN", countdownStart)
                 }
@@ -250,10 +252,23 @@ class PartyViewModel @Inject constructor(
                     _queue.value = queueList
 
                     // Update Sync Engine States
+                    val oldState = _playbackState.value
+                    val oldStartTime = _startTime.value
+                    
                     _playbackState.value = room.status.playbackState
                     _startTime.value = room.status.startTime
                     _readyState.value = room.status.readyState
                     _hostId.value = room.hostId // Update host ID
+                    
+                    // Log state changes
+                    if (oldState != room.status.playbackState) {
+                        Log.d("PartyVM", "[StateSync] playbackState: $oldState → ${room.status.playbackState}")
+                    }
+                    if (oldStartTime != room.status.startTime && room.status.startTime != 0L) {
+                        Log.d("PartyVM", "[StateSync] startTime updated: ${room.status.startTime}")
+                        Log.d("PartyVM", "[StateSync] Current local time: ${System.currentTimeMillis()}")
+                        Log.d("PartyVM", "[StateSync] Time difference: ${room.status.startTime - System.currentTimeMillis()}ms")
+                    }
                     
                     // Log for debugging
                     // println("DEBUG: Room Update Received! Members: ${membersList.size}")
