@@ -217,9 +217,15 @@ class GameViewModel @javax.inject.Inject constructor(
                 error = null
             )
             
-            if (isHost) {
-                // === HOST LOGIC: Load questions and create Firebase game session ===
+            // TEMPORARY FIX: Allow ANYONE to start game
+            // This bypasses Host detection issues dynamically
+            val canStartGame = true // was: if (isHost)
+            
+            if (canStartGame) {
+                // === LOGIC: Load questions and create Firebase game session ===
                 try {
+                    android.util.Log.d("GameViewModel", "User ${currentPlayerId} starting game $type in room $currentRoomId")
+                    
                     // Fetch questions from Firebase
                     val allQuestions = gameRepository.getQuestionsByType(type)
                     val filteredQuestions = allQuestions.shuffled().take(5)
