@@ -126,14 +126,12 @@ class GameViewModel @javax.inject.Inject constructor(
         // CLIENT LOGIC: Sync with host's game state
         when (session.phase) {
             "COUNTDOWN" -> {
-                // Host started countdown
-                if (_uiState.value.currentScreen != GameScreenState.COUNTDOWN) {
-                    _uiState.value = _uiState.value.copy(
-                        currentScreen = GameScreenState.COUNTDOWN,
-                        countdownTime = session.timeLeft
-                    )
-                    android.util.Log.d("GameViewModel", "CLIENT: Synced to COUNTDOWN phase")
-                }
+                // Host countdown - sync timer continuously
+                _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.COUNTDOWN,
+                    countdownTime = session.timeLeft
+                )
+                android.util.Log.d("GameViewModel", "CLIENT: Synced countdown: ${session.timeLeft}")
             }
             "PLAYING" -> {
                 // Game started, load questions if needed
@@ -277,7 +275,17 @@ class GameViewModel @javax.inject.Inject constructor(
         viewModelScope.launch {
             while (_uiState.value.countdownTime > 0 && _uiState.value.currentScreen == GameScreenState.COUNTDOWN) {
                 delay(1000)
-                _uiState.value = _uiState.value.copy(countdownTime = _uiState.value.countdownTime - 1)
+                val newTime = _uiState.value.countdownTime - 1
+                _uiState.value = _uiState.value.copy(countdownTime = newTime)
+                
+                // HOST: Update Firebase so clients see countdown
+                if (isHost && currentRoomId.isNotEmpty()) {
+                    partyRepository.updateGamePhase(
+                        roomId = currentRoomId,
+                        phase = "COUNTDOWN",
+                        additionalUpdates = mapOf("timeLeft" to newTime)
+                    )
+                }
             }
             if (_uiState.value.countdownTime == 0 && _uiState.value.currentScreen == GameScreenState.COUNTDOWN) {
                 startGame()
@@ -293,6 +301,20 @@ class GameViewModel @javax.inject.Inject constructor(
             viewModelScope.launch {
                 partyRepository.updatePlayerPlayingStatus(currentRoomId, currentPlayerId, true)
                 android.util.Log.d("GameViewModel", "Set playing = true in Firebase")
+                
+                // HOST: Update game phase to PLAYING
+                if (isHost) {
+                    partyRepository.updateGamePhase(
+                        roomId = currentRoomId,
+                        phase = "PLAYING",
+                        additionalUpdates = mapOf(
+                            "currentQuestionIndex" to 0,
+                            "timeLeft" to 10,
+                            "questionStartedAt" to System.currentTimeMillis()
+                        )
+                    )
+                    android.util.Log.d("GameViewModel", "HOST: Updated phase to PLAYING")
+                }
             }
         }
         
@@ -372,9 +394,19 @@ class GameViewModel @javax.inject.Inject constructor(
         viewModelScope.launch {
             while (_uiState.value.timeLeft > 0 && !_uiState.value.isAnswerRevealed && _uiState.value.currentScreen == GameScreenState.PLAYING) {
                 delay(1000)
-                _uiState.value = _uiState.value.copy(timeLeft = _uiState.value.timeLeft - 1)
+                val newTime = _uiState.value.timeLeft - 1
+                _uiState.value = _uiState.value.copy(timeLeft = newTime)
+                
+                // HOST: Update timer in Firebase so clients see countdown
+                if (isHost && currentRoomId.isNotEmpty()) {
+                    partyRepository.updateGamePhase(
+                        roomId = currentRoomId,
+                        phase = "PLAYING",
+                        additionalUpdates = mapOf("timeLeft" to newTime)
+                    )
+                }
             }
-            if (_uiState.value.timeLeft == 0 && !_uiState.value.isAnswerRevealed && _uiState.value.currentScreen == GameScreenState.PLAYING) {
+            if (_uiState.value.timeLeft == 0) {
                 revealAnswer()
             }
         }
