@@ -133,9 +133,16 @@ class PartyViewModel @Inject constructor(
 
                 if (readyCount >= requiredCount && requiredCount > 0) {
                     Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
+                    
                     // Use Firebase Server Time for perfect sync across all devices
-                    val countdownStart = partyRepository.getServerTime() + 5000
-                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart (server time)")
+                    val serverTime = partyRepository.getServerTime()
+                    val localTime = System.currentTimeMillis()
+                    val countdownStart = serverTime + 5000
+                    
+                    Log.d("PartyVM", "[HostControl] Local time: $localTime")
+                    Log.d("PartyVM", "[HostControl] Server time: $serverTime (offset: ${serverTime - localTime}ms)")
+                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart")
+                    
                     partyRepository.updatePlaybackState(roomIdValue, "COUNTDOWN", countdownStart)
                 }
             }.collect { }

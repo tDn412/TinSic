@@ -327,7 +327,11 @@ fun ActivePartyRoom(
                         LaunchedEffect(startTime) {
                             if (startTime == 0L) return@LaunchedEffect
                             
+                            val receivedAt = System.currentTimeMillis()
+                            android.util.Log.d("KaraokeUI", "========== COUNTDOWN START ==========")
                             android.util.Log.d("KaraokeUI", "[Countdown] startTime: $startTime")
+                            android.util.Log.d("KaraokeUI", "[Countdown] Received at: $receivedAt")
+                            android.util.Log.d("KaraokeUI", "[Countdown] Initial diff: ${startTime - receivedAt}ms")
                             
                             while (true) {
                                 // Use local time for calculation (offset already in startTime from server)
@@ -336,11 +340,16 @@ fun ActivePartyRoom(
                                 val remaining = kotlin.math.ceil(remainingMs / 1000.0).toInt()
                                 
                                 timeLeft = remaining.coerceAtLeast(0)
-                                android.util.Log.d("KaraokeUI", "[Countdown] Remaining: ${timeLeft}s (${remainingMs}ms)")
+                                
+                                if (remaining in 1..5) {  // Only log countdown numbers
+                                    android.util.Log.d("KaraokeUI", "[Countdown] $remaining (${remainingMs}ms remaining)")
+                                }
                                 
                                 if (timeLeft <= 0) break
                                 kotlinx.coroutines.delay(100)
                             }
+                            
+                            android.util.Log.d("KaraokeUI", "========== COUNTDOWN END ==========")
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
