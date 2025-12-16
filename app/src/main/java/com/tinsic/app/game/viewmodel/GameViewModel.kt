@@ -126,59 +126,65 @@ class GameViewModel @javax.inject.Inject constructor(
      * ALL PLAYERS (Host + Clients) sync to this Source of Truth
      */
     private fun handleGameSessionUpdate(session: com.tinsic.app.data.model.GameSession) {
-        android.util.Log.d("GameViewModel", "SYNC: Processing update phase=${session.phase}, index=${session.currentQuestionIndex}, isHost=$isHost")
+        android.util.Log.d("GameViewModel", "SYNC: Phase=${session.phase}, Time=${session.timeLeft}, Q-Index=${session.currentQuestionIndex}")
         
-        // REMOVED: if (isHost) return
-        // Reason: Host should also sync to Firebase to prevent "Split Brain" state 
-        // where Firebase is updated but local UI failed to transition.
+        // 1. Pre-load questions IMMEDIATELY if we have IDs but no local questions
+        // This ensures questions are ready BEFORE 'PLAYING' phase starts
+        if (_uiState.value.questions.isEmpty() && session.questionIds.isNotEmpty()) {
+            val alreadyLoading = _uiState.value.isLoading
+            if (!alreadyLoading) {
+                android.util.Log.d("GameViewModel", "SYNC: Verify Question IDs received, starting preload...")
+                viewModelScope.launch {
+                    loadQuestionsFromSession(session)
+                }
+            }
+        }
         
-        // Logic: Sync with global game state
+        // 2. Sync State based on Phase
         when (session.phase) {
             "COUNTDOWN" -> {
-                // Host countdown - sync timer continuously
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.COUNTDOWN,
                     countdownTime = session.timeLeft
                 )
-                android.util.Log.d("GameViewModel", "CLIENT: Synced countdown: ${session.timeLeft}")
             }
             "PLAYING" -> {
-                // Game started, load questions if needed
-                if (_uiState.value.questions.isEmpty() && session.questionIds.isNotEmpty()) {
-                    // Load questions based on host's question IDs
-                    viewModelScope.launch {
-                        loadQuestionsFromSession(session)
-                    }
-                }
-                
-                // Check if question changed (HOST moved to next question)
+                // Determine if we need to reset answer state (new question)
                 val questionChanged = _uiState.value.currentQuestionIndex != session.currentQuestionIndex
                 
-                // Sync current question and timer
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.PLAYING,
                     currentQuestionIndex = session.currentQuestionIndex,
                     timeLeft = session.timeLeft,
-                    // Reset answer state when question changes
+                    // Only reset if actually changed question index
                     selectedAnswerIndex = if (questionChanged) null else _uiState.value.selectedAnswerIndex,
                     isAnswerRevealed = if (questionChanged) false else _uiState.value.isAnswerRevealed,
                     isAnswerLocked = if (questionChanged) false else _uiState.value.isAnswerLocked
                 )
                 
                 if (questionChanged) {
-                    android.util.Log.d("GameViewModel", "CLIENT: Moved to question ${session.currentQuestionIndex}")
+                    android.util.Log.d("GameViewModel", "SYNC: Jumped to Question #${session.currentQuestionIndex}")
                 }
             }
             "ANSWER_REVEAL" -> {
-                // Host revealed answer
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.PLAYING,
                     isAnswerRevealed = true
                 )
-                android.util.Log.d("GameViewModel", "CLIENT: Answer revealed")
+            }
+            "QUESTION_RESULT" -> {
+                 _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.QUESTION_RESULT
+                )
+            }
+            "GAME_OVER" -> {
+                _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.RESULT,
+                    isGameOver = true
+                )
             }
             else -> {
-                android.util.Log.d("GameViewModel", "CLIENT: Unknown phase ${session.phase}")
+                // MENU or Unknown
             }
         }
     }
