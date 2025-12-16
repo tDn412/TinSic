@@ -80,11 +80,18 @@ class GameViewModel @javax.inject.Inject constructor(
      * Called from GameRoomScreen after PartyViewModel provides roomId
      */
     fun setRoomId(roomId: String) {
-        currentRoomId = roomId
-        android.util.Log.d("GameViewModel", "RoomId set: $roomId")
-        
-        // Start observing game session for synchronization
-        startObservingGameSession()
+        // Prevent redundant restarts if room ID hasn't changed
+        if (currentRoomId != roomId) {
+            currentRoomId = roomId
+            android.util.Log.d("GameViewModel", "RoomId changed to: $roomId. Starting observer.")
+            startObservingGameSession()
+        } else {
+            // Even if same room, ensure observer is running if it died (optional robust check)
+            if (gameSessionObserverJob?.isActive != true) {
+                android.util.Log.w("GameViewModel", "RoomId same ($roomId) but observer inactive. Restarting.")
+                startObservingGameSession()
+            }
+        }
     }
     
     /**
@@ -101,6 +108,8 @@ class GameViewModel @javax.inject.Inject constructor(
      */
     private fun startObservingGameSession() {
         if (currentRoomId.isEmpty()) return
+        
+        android.util.Log.d("GameViewModel", "START observing game session for Room: $currentRoomId")
         
         gameSessionObserverJob?.cancel()
         gameSessionObserverJob = viewModelScope.launch {
@@ -149,21 +158,35 @@ class GameViewModel @javax.inject.Inject constructor(
                 )
             }
             "PLAYING" -> {
-                // Determine if we need to reset answer state (new question)
                 val questionChanged = _uiState.value.currentQuestionIndex != session.currentQuestionIndex
                 
+                // Trigger reveal answer logic (score calculation + sync) when time hits 0
+                // This ensures Guest clients also calculate and sync their scores
+                if (session.timeLeft == 0 && !_uiState.value.isAnswerRevealed) {
+                    revealAnswer()
+                }
+                
+                // Logic for Music Preview (GUESS_THE_SONG)
+                // - Enable throughout the question time (so user can listen and answer)
+                // - Disable when timer hits 0 (Answer Reveal phase)
+                val isGuessTheSong = try { GameType.valueOf(session.gameType) == GameType.GUESS_THE_SONG } catch (e: Exception) { false }
+                val newMusicPreviewState = if (isGuessTheSong) {
+                    if (session.timeLeft > 0) true else false
+                } else false
+
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.PLAYING,
                     currentQuestionIndex = session.currentQuestionIndex,
                     timeLeft = session.timeLeft,
-                    // Only reset if actually changed question index
+                    // Reset state on new question
                     selectedAnswerIndex = if (questionChanged) null else _uiState.value.selectedAnswerIndex,
-                    isAnswerRevealed = if (questionChanged) false else _uiState.value.isAnswerRevealed,
-                    isAnswerLocked = if (questionChanged) false else _uiState.value.isAnswerLocked
+                    isAnswerRevealed = if (session.timeLeft == 0) true else (if (questionChanged) false else _uiState.value.isAnswerRevealed),
+                    isAnswerLocked = if (questionChanged) false else _uiState.value.isAnswerLocked,
+                    isMusicPreviewPhase = newMusicPreviewState
                 )
                 
                 if (questionChanged) {
-                    android.util.Log.d("GameViewModel", "SYNC: Jumped to Question #${session.currentQuestionIndex}")
+                    android.util.Log.d("GameViewModel", "SYNC: Jumped to Q#${session.currentQuestionIndex}. MusicPreview=$newMusicPreviewState")
                 }
             }
             "ANSWER_REVEAL" -> {
@@ -172,9 +195,16 @@ class GameViewModel @javax.inject.Inject constructor(
                     isAnswerRevealed = true
                 )
             }
+            "MUSIC_PREVIEW" -> {
+                _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.MUSIC_PREVIEW,
+                    isMusicPreviewPhase = true
+                )
+            }
             "QUESTION_RESULT" -> {
                  _uiState.value = _uiState.value.copy(
-                    currentScreen = GameScreenState.QUESTION_RESULT
+                    currentScreen = GameScreenState.QUESTION_RESULT,
+                    isAnswerRevealed = true
                 )
             }
             "GAME_OVER" -> {
@@ -201,7 +231,7 @@ class GameViewModel @javax.inject.Inject constructor(
             // Filter and order questions to match host's question IDs
             val orderedQuestions = session.questionIds.mapNotNull { questionIdStr ->
                 // Try parsing as Int (direct ID) first, OR matches String representation of Int ID
-                val allQuestionsMap = allQuestions.associateBy { it.id.toString() }
+                val allQuestionsMap = allQuestions.associateBy { it.id }
                 val question = allQuestionsMap[questionIdStr]
                 
                 if (question == null) {
@@ -240,7 +270,7 @@ class GameViewModel @javax.inject.Inject constructor(
                     
                     // Fetch questions from Firebase
                     val allQuestions = gameRepository.getQuestionsByType(type)
-                    val filteredQuestions = allQuestions.shuffled().take(5)
+                    val filteredQuestions = allQuestions.sortedBy { it.id }.take(5)
                     
                     if (filteredQuestions.isEmpty()) {
                         _uiState.value = _uiState.value.copy(
@@ -279,7 +309,7 @@ class GameViewModel @javax.inject.Inject constructor(
                     )
                     
                     // Create game session in Firebase for all players to sync
-                    val questionIds = filteredQuestions.map { it.id.toString() }
+                    val questionIds = filteredQuestions.map { it.id }
                     partyRepository.startGameSession(
                         roomId = currentRoomId,
                         hostId = currentPlayerId,
@@ -315,13 +345,19 @@ class GameViewModel @javax.inject.Inject constructor(
                 val newTime = _uiState.value.countdownTime - 1
                 _uiState.value = _uiState.value.copy(countdownTime = newTime)
                 
-                // HOST: Update Firebase so clients see countdown
+                // HOST: Update Firebase so clients see countdown (Fire-and-forget to avoid blocking)
                 if (isHost && currentRoomId.isNotEmpty()) {
-                    partyRepository.updateGamePhase(
-                        roomId = currentRoomId,
-                        phase = "COUNTDOWN",
-                        additionalUpdates = mapOf("timeLeft" to newTime)
-                    )
+                    launch {
+                        try {
+                            partyRepository.updateGamePhase(
+                                roomId = currentRoomId,
+                                phase = "COUNTDOWN",
+                                additionalUpdates = mapOf("timeLeft" to newTime)
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.w("GameViewModel", "HOST: Failed to sync countdown: ${e.message}")
+                        }
+                    }
                 }
             }
             if (_uiState.value.countdownTime == 0 && _uiState.value.currentScreen == GameScreenState.COUNTDOWN) {
@@ -424,6 +460,11 @@ class GameViewModel @javax.inject.Inject constructor(
                 currentScreen = GameScreenState.QUESTION_RESULT
             )
             
+            // HOST: Sync phase QUESTION_RESULT
+            if (isHost && currentRoomId.isNotEmpty()) {
+                partyRepository.updateGamePhase(currentRoomId, "QUESTION_RESULT")
+            }
+            
             delay(5000)
             nextQuestion()
         }
@@ -440,13 +481,19 @@ class GameViewModel @javax.inject.Inject constructor(
                 val newTime = _uiState.value.timeLeft - 1
                 _uiState.value = _uiState.value.copy(timeLeft = newTime)
                 
-                // HOST: Update timer in Firebase so clients see countdown
+                // HOST: Update timer in Firebase so clients see countdown (Fire-and-forget)
                 if (isHost && currentRoomId.isNotEmpty()) {
-                    partyRepository.updateGamePhase(
-                        roomId = currentRoomId,
-                        phase = "PLAYING",
-                        additionalUpdates = mapOf("timeLeft" to newTime)
-                    )
+                    launch {
+                        try {
+                            partyRepository.updateGamePhase(
+                                roomId = currentRoomId,
+                                phase = "PLAYING",
+                                additionalUpdates = mapOf("timeLeft" to newTime)
+                            )
+                        } catch (e: Exception) {
+                             android.util.Log.w("GameViewModel", "HOST: Failed to sync timer: ${e.message}")
+                        }
+                    }
                 }
             }
             if (_uiState.value.timeLeft == 0) {
@@ -463,7 +510,7 @@ class GameViewModel @javax.inject.Inject constructor(
         )
     }
 
-    private fun revealAnswer() {
+    fun revealAnswer() {
         val question = currentQuestion ?: return
         val isCorrect = _uiState.value.selectedAnswerIndex == question.correctAnswerIndex
         
@@ -525,10 +572,17 @@ class GameViewModel @javax.inject.Inject constructor(
             delay(2000)
             
             // For LYRICS_FLIP, FINISH_THE_LYRICS, and MUSIC_CODE, show music preview after answer
+            // For LYRICS_FLIP, FINISH_THE_LYRICS, and MUSIC_CODE, show music preview after answer
             if (question.type == GameType.LYRICS_FLIP || question.type == GameType.FINISH_THE_LYRICS || question.type == GameType.MUSIC_CODE) {
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.MUSIC_PREVIEW
                 )
+                
+                // HOST: Sync phase MUSIC_PREVIEW
+                if (isHost && currentRoomId.isNotEmpty()) {
+                    partyRepository.updateGamePhase(currentRoomId, "MUSIC_PREVIEW")
+                }
+                
                 // Music will finish on its own, no fixed delay needed
                 // The onMusicFinished callback will handle the transition
                 return@launch
@@ -537,6 +591,11 @@ class GameViewModel @javax.inject.Inject constructor(
             _uiState.value = _uiState.value.copy(
                 currentScreen = GameScreenState.QUESTION_RESULT
             )
+            
+            // HOST: Sync phase QUESTION_RESULT
+            if (isHost && currentRoomId.isNotEmpty()) {
+                partyRepository.updateGamePhase(currentRoomId, "QUESTION_RESULT")
+            }
             
             delay(5000)
             nextQuestion()

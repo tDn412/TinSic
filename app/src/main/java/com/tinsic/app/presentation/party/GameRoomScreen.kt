@@ -134,6 +134,18 @@ fun GameRoomScreen(
                 )
             }
         }
+
+        // DEBUG OVERLAY
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(4.dp)
+        ) {
+            Text("Deb: R${roomId} | ${gameUiState.currentScreen}", color = Color.Yellow, fontSize = 10.sp)
+            Text("Q:${gameUiState.questions.size} | Idx:${gameUiState.currentQuestionIndex}", color = Color.Yellow, fontSize = 10.sp)
+        }
     }
 }
 

@@ -64,20 +64,29 @@ fun MusicPreviewScreen(
 
     LaunchedEffect(currentQuestion) {
         if (currentQuestion != null) {
-            try {
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-                val audioUrl = currentQuestion.musicUrl ?: currentQuestion.content
-                val mediaItem = MediaItem.fromUri(audioUrl)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-                exoPlayer.playWhenReady = true
-                currentPosition = 0f
-                
-                Log.d("MusicPreview", "Playing: $audioUrl")
-            } catch (e: Exception) {
-                Log.e("MusicPreview", "Error loading: ${e.message}")
-                e.printStackTrace()
+            val audioUrl = currentQuestion.musicUrl ?: currentQuestion.content
+            
+            // Check if we are already playing this URL to avoid replay on recompose
+            val currentMediaItem = exoPlayer.currentMediaItem
+            val isPlayingSameUrl = currentMediaItem?.mediaId == audioUrl || currentMediaItem?.localConfiguration?.uri.toString() == audioUrl
+            
+            if (!isPlayingSameUrl) {
+                try {
+                    exoPlayer.stop()
+                    exoPlayer.clearMediaItems()
+                    val mediaItem = MediaItem.fromUri(audioUrl)
+                    exoPlayer.setMediaItem(mediaItem)
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                    currentPosition = 0f
+                    
+                    Log.d("MusicPreview", "Playing: $audioUrl")
+                } catch (e: Exception) {
+                    Log.e("MusicPreview", "Error loading: ${e.message}")
+                    e.printStackTrace()
+                }
+            } else {
+                 Log.d("MusicPreview", "Already playing this URL, skipping restart")
             }
         }
     }

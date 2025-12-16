@@ -60,6 +60,24 @@ fun PlayScreen(
     onSubmitAnswer: (Int) -> Unit
 ) {
     val context = LocalContext.current
+    
+    // DEBUG: Log when PlayScreen is composed
+    LaunchedEffect(Unit) {
+        Log.d("GamePlayScreen", "PlayScreen COMPOSED. Question: ${currentQuestion?.id}, Type: ${currentQuestion?.type}")
+    }
+    
+    // 1. Show Loading if question is not ready yet
+    if (currentQuestion == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Đang tải câu hỏi...", color = Color.White)
+            }
+        }
+        return
+    }
+
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0f) }
 
@@ -97,24 +115,36 @@ fun PlayScreen(
         if (currentQuestion != null && currentQuestion.type == GameType.GUESS_THE_SONG) {
             // Only GUESS_THE_SONG plays music during music preview phase
             if (uiState.isMusicPreviewPhase && !uiState.isAnswerRevealed) {
-                try {
-                    exoPlayer.stop()
-                    exoPlayer.clearMediaItems()
-                    val clippingConfiguration = MediaItem.ClippingConfiguration.Builder().setEndPositionMs(10000).build(); val mediaItem = MediaItem.Builder().setUri(currentQuestion.content).setClippingConfiguration(clippingConfiguration).build()
-                    exoPlayer.setMediaItem(mediaItem)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = true
-                    currentPosition = 0f
-                } catch (e: Exception) { e.printStackTrace() }
+                // Check if we are already playing this URL
+                val audioUrl = currentQuestion.content
+                val currentMediaItem = exoPlayer.currentMediaItem
+                val isPlayingSameUrl = currentMediaItem?.localConfiguration?.uri.toString() == audioUrl || 
+                                      currentMediaItem?.mediaId == audioUrl
+
+                if (!isPlayingSameUrl) {
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                        val clippingConfiguration = MediaItem.ClippingConfiguration.Builder().setEndPositionMs(10000).build()
+                        val mediaItem = MediaItem.Builder().setUri(audioUrl).setClippingConfiguration(clippingConfiguration).build()
+                        exoPlayer.setMediaItem(mediaItem)
+                        exoPlayer.prepare()
+                        exoPlayer.playWhenReady = true
+                        currentPosition = 0f
+                        Log.d("GamePlayScreen", "Playing: $audioUrl")
+                    } catch (e: Exception) { e.printStackTrace() }
+                } else {
+                     Log.d("GamePlayScreen", "Already playing this URL, skipping restart")
+                }
             } else if (!uiState.isMusicPreviewPhase && !uiState.isAnswerRevealed) {
                 // Stop music when entering answer phase
-                exoPlayer.stop()
+                if (exoPlayer.isPlaying) exoPlayer.stop()
             } else if (uiState.isAnswerRevealed) {
                 // Stop music when answer is revealed
-                exoPlayer.stop()
+                if (exoPlayer.isPlaying) exoPlayer.stop()
             }
         } else {
-            exoPlayer.stop()
+            if (exoPlayer.isPlaying) exoPlayer.stop()
         }
     }
 
@@ -409,7 +439,7 @@ fun PlayScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(60.dp)
-                            .clickable(enabled = !uiState.isAnswerLocked && !uiState.isMusicPreviewPhase) {
+                            .clickable(enabled = !uiState.isAnswerLocked) {
                                 onSubmitAnswer(index)
                             },
                         shape = RoundedCornerShape(16.dp),

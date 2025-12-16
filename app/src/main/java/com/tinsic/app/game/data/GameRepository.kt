@@ -76,7 +76,7 @@ class GameRepository @Inject constructor() {
  */
 private fun QuestionDto.toQuestion(): Question {
     return Question(
-        id = id.toIntOrNull() ?: id.hashCode(), // Fallback to hashCode if not numeric
+        id = id,
         type = try {
             GameType.valueOf(type)
         } catch (e: Exception) {

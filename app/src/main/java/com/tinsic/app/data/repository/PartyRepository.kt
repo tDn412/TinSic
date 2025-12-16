@@ -245,10 +245,12 @@ class PartyRepository @Inject constructor(
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val session = snapshot.getValue(com.tinsic.app.data.model.GameSession::class.java)
+                android.util.Log.d("PartyRep_RAW", "Data: ${snapshot.key} => ${snapshot.value}") // Raw Data Log
                 trySend(session)
             }
             
             override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("PartyRep_RAW", "Cancelled: ${error.message}")
                 trySend(null)
             }
         }
@@ -274,7 +276,7 @@ class PartyRepository @Inject constructor(
                 currentQuestionIndex = 0,
                 timeLeft = 5,  // Countdown
                 phase = "COUNTDOWN",
-                questionIds = questionIds.shuffled(),  // Same order for all players
+                questionIds = questionIds,  // Use order provided by ViewModel (sorted by ID)
                 startedAt = System.currentTimeMillis(),
                 countdownStartedAt = System.currentTimeMillis(),
                 questionStartedAt = 0

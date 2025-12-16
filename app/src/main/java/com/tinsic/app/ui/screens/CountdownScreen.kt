@@ -18,6 +18,11 @@ import com.tinsic.app.game.model.GameType
 
 @Composable
 fun CountdownScreen(gameType: GameType?, countdownTime: Int) {
+    // DEBUG: Check if UI receives updates
+    SideEffect {
+        android.util.Log.d("CountdownScreen", "Recomposed with time: $countdownTime")
+    }
+
     // Pulsing animation for countdown
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(

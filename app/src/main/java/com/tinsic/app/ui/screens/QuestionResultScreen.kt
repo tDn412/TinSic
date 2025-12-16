@@ -160,37 +160,6 @@ fun LeaderboardItem(rank: Int, player: PlayerScore) {
                         fontWeight = if (player.isCurrentPlayer) FontWeight.Bold else FontWeight.Medium,
                         color = if (player.isCurrentPlayer) Color.Yellow else Color.White
                     )
-                    
-                    // Show if answered correctly
-                    if (player.answeredCorrectly) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Đúng",
-                                fontSize = 12.sp,
-                                color = Color(0xFF4CAF50)
-                            )
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = null,
-                                tint = Color(0xFFE57373),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Sai",
-                                fontSize = 12.sp,
-                                color = Color(0xFFE57373)
-                            )
-                        }
-                    }
                 }
             }
 

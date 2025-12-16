@@ -20,7 +20,7 @@ enum class GameScreenState {
 
 // Cấu trúc câu hỏi
 data class Question(
-    val id: Int,
+    val id: String,
     val type: GameType,
     val content: String, // URL nhạc (cho GUESS_THE_SONG, FINISH_THE_LYRICS) hoặc Lời bài hát (lyrics text cho LYRICS_FLIP)
     val options: List<String>,
