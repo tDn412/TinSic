@@ -76,6 +76,10 @@ class PartyViewModel @Inject constructor(
     private val _readyState = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val readyState: StateFlow<Map<String, Boolean>> = _readyState.asStateFlow()
 
+    // Host ID for sync control
+    private val _hostId = MutableStateFlow("")
+    val hostId: StateFlow<String> = _hostId.asStateFlow()
+
     init {
         // Generate a random Room ID immediately when entering Lobby
         _roomId.value = generateRoomId()
@@ -87,9 +91,15 @@ class PartyViewModel @Inject constructor(
             playbackState.collect { state ->
                 if (state == "LOADING") {
                     Log.d("PartyVM", "[SimulateDownload] State=LOADING, starting resource load...")
+                    Log.d("PartyVM", "[SimulateDownload] Current User: ${_currentUser.value.id}, Room: ${_roomId.value}")
                     kotlinx.coroutines.delay(3000) // Simulate MP3/JSON download
                     Log.d("PartyVM", "[SimulateDownload] Resource loaded! Setting ready...")
-                    partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
+                    val result = partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
+                    if (result.isSuccess) {
+                        Log.d("PartyVM", "[SimulateDownload] ✅ Ready state updated successfully!")
+                    } else {
+                        Log.e("PartyVM", "[SimulateDownload] ❌ Failed to update ready state: ${result.exceptionOrNull()}")
+                    }
                 }
             }
         }
@@ -99,22 +109,26 @@ class PartyViewModel @Inject constructor(
             kotlinx.coroutines.flow.combine(
                 readyState,
                 stageUsers,
-                connectedUsers,
                 currentUser,
-                roomId
-            ) { ready, stage, members, user, roomIdValue ->
-                // Only run if I'm the host
-                val room = members.find { it.id == user.id } ?: return@combine
-                val hostId = members.firstOrNull()?.id ?: "" // Simplified: assume first member is host
+                roomId,
+                hostId
+            ) { ready, stage, user, roomIdValue, currentHostId ->
+                // Debug log
+                Log.d("PartyVM", "[HostControl] Current User: ${user.id}, Host: $currentHostId, State: ${_playbackState.value}")
                 
-                if (user.id != hostId) return@combine // Not host, skip
+                // Only run if I'm the host
+                if (user.id != currentHostId) {
+                    Log.d("PartyVM", "[HostControl] Not host, skipping...")
+                    return@combine
+                }
                 if (_playbackState.value != "LOADING") return@combine // Not in loading state
 
                 // Calculate required ready count: stage members + host
                 val requiredCount = stage.size + 1 // Host + stage performers
                 val readyCount = ready.values.count { it }
 
-                Log.d("PartyVM", "[HostControl] Ready: $readyCount/$requiredCount")
+                Log.d("PartyVM", "[HostControl] Ready: $readyCount/$requiredCount (Stage: ${stage.size})")
+                Log.d("PartyVM", "[HostControl] Ready State: $ready")
 
                 if (readyCount >= requiredCount && requiredCount > 0) {
                     Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
@@ -227,6 +241,7 @@ class PartyViewModel @Inject constructor(
                     _playbackState.value = room.status.playbackState
                     _startTime.value = room.status.startTime
                     _readyState.value = room.status.readyState
+                    _hostId.value = room.hostId // Update host ID
                     
                     // Log for debugging
                     // println("DEBUG: Room Update Received! Members: ${membersList.size}")
