@@ -71,9 +71,6 @@ fun MusicPreviewScreen(
                 // Tắt skip silence để tránh hiện tượng rè
                 skipSilenceEnabled = false
                 
-                // Tắt audio offload để tránh glitches
-                experimentalSetOffloadSchedulingEnabled(false)
-                
                 // Set volume ổn định
                 volume = 0.8f
                 

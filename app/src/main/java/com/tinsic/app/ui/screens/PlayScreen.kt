@@ -102,9 +102,6 @@ fun PlayScreen(
                 // Tắt skip silence để tránh hiện tượng rè
                 skipSilenceEnabled = false
                 
-                // Tắt audio offload để tránh glitches (distortion)
-                experimentalSetOffloadSchedulingEnabled(false)
-                
                 // Set volume ổn định ở mức vừa phải
                 volume = 0.8f  // Giảm từ 1.0 xuống 0.8 để tránh clipping
                 
