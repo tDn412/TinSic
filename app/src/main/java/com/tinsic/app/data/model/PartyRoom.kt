@@ -41,9 +41,11 @@ data class QueueSong(
     val artist: String = "",
     val coverUrl: String = "",
     val audioUrl: String = "", // Used for playback
+    val lyricUrl: String = "", // LRC or JSON lyrics
+    val pitchDataUrl: String = "", // Asset for scoring (Pitch contour)
     val addedByUserId: String = "",
     val addedByUserName: String = "",
     val timestamp: Long = 0L
 ) {
-    constructor() : this("", "", "", "", "", "", "", 0L)
+    constructor() : this("", "", "", "", "", "", "", "", "", 0L)
 }

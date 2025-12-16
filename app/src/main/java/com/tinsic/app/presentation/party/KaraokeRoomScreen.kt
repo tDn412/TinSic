@@ -105,12 +105,24 @@ fun ActivePartyRoom(
                                             .padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                    if (song.coverUrl.isNotBlank()) {
                                         AsyncImage(
                                             model = song.coverUrl,
                                             contentDescription = null,
                                             modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)),
                                             contentScale = ContentScale.Crop
                                         )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color.DarkGray),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.White)
+                                        }
+                                    }
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(song.title, color = Color.White, fontWeight = FontWeight.Bold)
