@@ -13,5 +13,5 @@ data class QuestionDto(
     val musicUrl: String? = null,
     val songTitle: String? = null,
     val lyrics: String? = null,
-    val isActive: Boolean = true
+    @get:com.google.firebase.firestore.PropertyName("isActive") val isActive: Boolean = true
 )

@@ -8,7 +8,7 @@ import com.tinsic.app.game.model.GameType
  */
 data class GameSession(
     val gameType: String = "",  // GameType enum name
-    val isActive: Boolean = false,
+    @get:com.google.firebase.database.PropertyName("isActive") val isActive: Boolean = false,
     val hostId: String = "",
     val currentQuestionIndex: Int = 0,
     val timeLeft: Int = 10,
