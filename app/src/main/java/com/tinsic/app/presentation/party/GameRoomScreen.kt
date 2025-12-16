@@ -36,10 +36,18 @@ fun GameRoomScreen(
     val currentUser by partyViewModel.currentUser.collectAsState()
     val roomId by partyViewModel.roomId.collectAsState()
     val gameUiState by gameViewModel.uiState.collectAsState()
+    
+    // Get PlayerViewModel to pause music
+    val playerViewModel: com.tinsic.app.presentation.player.PlayerViewModel = hiltViewModel()
 
     // Inject real players into GameViewModel whenever players change
     LaunchedEffect(partyUsers, currentUser) {
         gameViewModel.setPlayers(partyUsers, currentUser.id)
+    }
+    
+    // Pause music when entering Game Room to avoid conflicts
+    LaunchedEffect(Unit) {
+        playerViewModel.pause()
     }
 
     // Gradient Background matching Party theme
