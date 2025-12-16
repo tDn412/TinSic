@@ -4,12 +4,15 @@ import com.tinsic.app.game.model.GameType
 import com.tinsic.app.game.model.Question
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Repository for managing game questions
  * Loads data from Firebase Firestore
  */
-class GameRepository {
+@Singleton
+class GameRepository @Inject constructor() {
     private val firestore = FirebaseFirestore.getInstance()
     private val questionsCollection = firestore.collection("minigames")
     
