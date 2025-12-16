@@ -11,3 +11,7 @@
 
 # Keep data classes (for Firebase serialization)
 -keep class com.tinsic.app.data.model.** { *; }
+
+# Keep DataStore and Protobuf
+-keep class androidx.datastore.** { *; }
+-keep class androidx.datastore.preferences.protobuf.** { *; }

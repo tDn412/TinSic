@@ -16,21 +16,22 @@ class TinSicMediaService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
 
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        return mediaSession
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return super.onStartCommand(intent, flags, startId)
+    }
+
+
+
     override fun onCreate() {
         super.onCreate()
         val player = player
         
         // build MediaSession
         mediaSession = MediaSession.Builder(this, player).build()
-        
-        // Set Notification Provider to ensure Notification is shown
-        val notificationProvider = androidx.media3.session.DefaultMediaNotificationProvider(this)
-        notificationProvider.setSmallIcon(com.tinsic.app.R.mipmap.ic_launcher_round)
-        setMediaNotificationProvider(notificationProvider)
-    }
-
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -42,7 +43,8 @@ class TinSicMediaService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.run {
-            player.release()
+            // Do NOT release player here as it is a Singleton injected by Hilt.
+            // player.release() 
             release()
             mediaSession = null
         }

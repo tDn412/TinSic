@@ -11,4 +11,8 @@ sealed class Screen(val route: String) {
     object Player : Screen("player")
     object Karaoke : Screen("karaoke_screen") // Hidden route for now
     object PartyRoom : Screen("party_room")
+    object History : Screen("history")
+    object PlaylistDetail : Screen("playlist_detail/{playlistId}/{userId}") {
+        fun createRoute(playlistId: String, userId: String) = "playlist_detail/$playlistId/$userId"
+    }
 }

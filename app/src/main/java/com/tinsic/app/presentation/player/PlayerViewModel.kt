@@ -34,7 +34,8 @@ class PlayerViewModel @Inject constructor(
     private val songRepository: SongRepository,
     private val userRepository: UserRepository,
     private val auth: FirebaseAuth,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val playbackDataStore: com.tinsic.app.data.local.PlaybackDataStore
 ) : ViewModel() {
 
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -68,23 +69,144 @@ class PlayerViewModel @Inject constructor(
     private var historyTrackingJob: Job? = null
     private var isPreviewMode = false
 
+    private val _user = MutableStateFlow<com.tinsic.app.data.model.User?>(null)
+    val user: StateFlow<com.tinsic.app.data.model.User?> = _user.asStateFlow()
+
+    private val _isLiked = MutableStateFlow(false)
+    val isLiked: StateFlow<Boolean> = _isLiked.asStateFlow()
+
+    private val _userPlaylists = MutableStateFlow<List<com.tinsic.app.data.model.Playlist>>(emptyList())
+    val userPlaylists: StateFlow<List<com.tinsic.app.data.model.Playlist>> = _userPlaylists.asStateFlow()
+
+    private val playerListener = object : androidx.media3.common.Player.Listener {
+        // ... (existing listener methods) ...
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _isPlaying.value = isPlaying
+            if (isPlaying) {
+                // Determine duration if unknown
+                if (_duration.value == 0L && exoPlayer.duration > 0) {
+                    _duration.value = exoPlayer.duration
+                }
+            }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == androidx.media3.common.Player.STATE_READY && exoPlayer.isPlaying) {
+                 _duration.value = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+            }
+             if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                 playNext() // Auto play next
+            }
+        }
+        
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            error.printStackTrace()
+             println("DEBUG_PLAYER: Error code=${error.errorCode}, message=${error.message}")
+            _isPlaying.value = false
+        }
+    }
+
     init {
+        exoPlayer.addListener(playerListener)
+        
+        // Observe Current User & Playlists
+        viewModelScope.launch {
+            auth.currentUser?.uid?.let { uid ->
+                launch {
+                    userRepository.getUserById(uid).collect { user ->
+                        _user.value = user
+                        checkIsLiked()
+                    }
+                }
+                launch {
+                    userRepository.getUserPlaylists(uid).collect { playlists ->
+                        _userPlaylists.value = playlists
+                    }
+                }
+            }
+        }
+
+
         // Update playback position and lyrics periodically
         viewModelScope.launch {
             while (isActive) {
-                if (exoPlayer.isPlaying) {
+                if (_isPlaying.value) {
                     _currentPosition.value = exoPlayer.currentPosition
-                    _duration.value = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+                    if (_duration.value <= 0 && exoPlayer.duration > 0) {
+                         _duration.value = exoPlayer.duration
+                    }
                     updateCurrentLyricLine()
                 }
                 delay(100)
             }
+            // Restore last playback state
+        viewModelScope.launch {
+            launch {
+                playbackDataStore.lastPlaylist.collect { restoredPlaylist ->
+                    if (_playlist.value.isEmpty() && restoredPlaylist.isNotEmpty()) {
+                        _playlist.value = restoredPlaylist
+                    }
+                }
+            }
+            launch {
+                playbackDataStore.lastSong.collect { lastSong ->
+                    if (_currentSong.value == null && lastSong != null) {
+                         _currentSong.value = lastSong
+                         // Prepare player but don't play
+                         val mediaItem = MediaItem.Builder()
+                            .setUri(lastSong.audioUrl)
+                            .setMediaMetadata(
+                                MediaMetadata.Builder()
+                                    .setTitle(lastSong.title)
+                                    .setArtist(lastSong.artist)
+                                    .setArtworkUri(Uri.parse(lastSong.coverUrl))
+                                    .build()
+                            )
+                            .build()
+                        exoPlayer.setMediaItem(mediaItem)
+                        exoPlayer.prepare()
+                        exoPlayer.pause() // Default to paused
+                        
+                        // Find index
+                        currentIndex = _playlist.value.indexOfFirst { it.id == lastSong.id }.takeIf { it != -1 } ?: 0
+                    }
+                }
+            }
+        }
+    }
+    }
+    
+    private fun checkIsLiked() {
+        val songId = _currentSong.value?.id ?: return
+        val likedSongs = _user.value?.likedSongs ?: emptyList()
+        _isLiked.value = likedSongs.contains(songId)
+    }
+
+    fun toggleLike() {
+        val songId = _currentSong.value?.id ?: return
+        val uid = auth.currentUser?.uid ?: return
+        val currentLiked = _isLiked.value
+        
+        // Optimistic Update
+        _isLiked.value = !currentLiked
+        
+        viewModelScope.launch {
+            val result = if (currentLiked) {
+                userRepository.dislikeSong(uid, songId)
+            } else {
+                userRepository.likeSong(uid, songId)
+            }
+            // Revert if failed (optional, usually firestore listener will correct it)
+             if (result.isFailure) {
+                 _isLiked.value = currentLiked
+             }
         }
     }
 
     fun playSong(song: Song) {
         isPreviewMode = false
         _currentSong.value = song
+        checkIsLiked() // Update like status
         
         // Create MediaItem with Metadata for Notification
         val mediaItem = MediaItem.Builder()
@@ -101,14 +223,18 @@ class PlayerViewModel @Inject constructor(
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         exoPlayer.play()
-        _isPlaying.value = true
+        // _isPlaying.value = true -> REMOVED, relying on Listener
         
-        // Start Media Service for Foreground Playback & Notification
-        val intent = Intent(context, TinSicMediaService::class.java)
+        // Start Media Service for Action
+        val intent = Intent(context, TinSicMediaService::class.java).apply {
+            action = "ACTION_START_PLAYBACK"
+        }
         try {
-            context.startForegroundService(intent)
-        } catch (e: Exception) {
+            // Use startService to avoid ForegroundServiceDidNotStartInTimeException
+            // MediaSessionService will promote itself to foreground when playback starts
             context.startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         
         // Load lyrics
@@ -116,6 +242,14 @@ class PlayerViewModel @Inject constructor(
         
         // Start history tracking (30 second threshold)
         startHistoryTracking(song)
+        
+        // Save state
+        viewModelScope.launch {
+            playbackDataStore.saveLastSong(song)
+            if (_playlist.value.isNotEmpty()) {
+                 playbackDataStore.savePlaylist(_playlist.value)
+            }
+        }
     }
 
     fun playPreview(song: Song, durationSeconds: Int = 15) {
@@ -128,7 +262,7 @@ class PlayerViewModel @Inject constructor(
         // Always start from beginning for preview
         exoPlayer.seekTo(0)
         exoPlayer.play()
-        _isPlaying.value = true
+        // _isPlaying.value = true -> REMOVED
         
         // Auto-stop after preview duration
         viewModelScope.launch {
@@ -141,7 +275,7 @@ class PlayerViewModel @Inject constructor(
 
     fun pause() {
         exoPlayer.pause()
-        _isPlaying.value = false
+        // _isPlaying.value = false -> REMOVED
         historyTrackingJob?.cancel()
     }
 
@@ -150,7 +284,6 @@ class PlayerViewModel @Inject constructor(
             pause()
         } else {
             exoPlayer.play()
-            _isPlaying.value = true
         }
     }
 
@@ -181,6 +314,26 @@ class PlayerViewModel @Inject constructor(
         }
         
         playSong(_playlist.value[currentIndex])
+    }
+
+    fun createPlaylist(name: String, addCurrentSong: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+             val result = userRepository.createPlaylist(uid, name)
+             if (result.isSuccess && addCurrentSong) {
+                 val playlistId = result.getOrNull()
+                 if (playlistId != null) {
+                     addToPlaylist(playlistId)
+                 }
+             }
+        }
+    }
+
+    fun addToPlaylist(playlistId: String) {
+         val songId = _currentSong.value?.id ?: return
+         viewModelScope.launch {
+             userRepository.addToPlaylist(playlistId, songId)
+         }
     }
 
     fun toggleShuffle() {
