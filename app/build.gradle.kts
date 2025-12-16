@@ -72,6 +72,9 @@ dependencies {
     // Lifecycle & ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
+    
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.5")
@@ -100,11 +103,16 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.2.0")
     implementation("androidx.media3:media3-ui:1.2.0")
     implementation("androidx.media3:media3-session:1.2.0")
+    implementation("androidx.media3:media3-database:1.2.0")
+    implementation("androidx.media3:media3-datasource:1.2.0")
 
     // TensorFlow Lite (Karaoke Module)
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
+
+    // Gson
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Accompanist (for pager, permissions, etc.)
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")

@@ -90,12 +90,18 @@ fun TinSicNavGraph(
                     onPlayerExpand = { showPlayer = true },
                     playerViewModel = playerViewModel
                 ) {
+
                     HomeScreen(
-                        onSongClick = { song ->
-                            playerViewModel.playSong(song)
+                        onSongClick = { song, playlist ->
+                            // Calculate start index based on clicked song
+                            val startIndex = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                            playerViewModel.setPlaylist(playlist, startIndex)
                         },
                         onProfileClick = {
                             navController.navigate(Screen.Profile.route)
+                        },
+                        onHistoryClick = {
+                            navController.navigate(Screen.History.route)
                         }
                     )
                 }
@@ -147,6 +153,9 @@ fun TinSicNavGraph(
                             navController.navigate(Screen.Login.route) {
                                 popUpTo(0) { inclusive = true }
                             }
+                        },
+                        onPlaylistClick = { playlistId, userId ->
+                            navController.navigate(Screen.PlaylistDetail.createRoute(playlistId, userId))
                         }
                     )
                 }
@@ -154,6 +163,43 @@ fun TinSicNavGraph(
 
             composable(Screen.Karaoke.route) {
                 com.tinsic.app.presentation.karaoke.KaraokeScreen()
+            }
+            
+            composable(Screen.History.route) {
+                // Not in MainScaffold to allow full screen with back button
+                 com.tinsic.app.presentation.history.HistoryScreen(
+                     onBackClick = { navController.popBackStack() },
+                     onSongClick = { song: com.tinsic.app.data.model.Song, playlist: List<com.tinsic.app.data.model.Song> ->
+                         val startIndex = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                         playerViewModel.setPlaylist(playlist, startIndex)
+                     },
+                     playerViewModel = playerViewModel,
+                     onPlayerExpand = { showPlayer = true }
+                 )
+            }
+            
+            composable(
+                route = Screen.PlaylistDetail.route,
+                arguments = listOf(
+                    androidx.navigation.navArgument("playlistId") { type = androidx.navigation.NavType.StringType },
+                    androidx.navigation.navArgument("userId") { type = androidx.navigation.NavType.StringType }
+                )
+            ) {
+                 com.tinsic.app.presentation.playlist.PlaylistDetailScreen(
+                     onBackClick = { navController.popBackStack() },
+                     onPlayPlaylist = { songs: List<com.tinsic.app.data.model.Song>, shuffle: Boolean ->
+                         if (songs.isNotEmpty()) {
+                             val playlistToPlay = if (shuffle) songs.shuffled() else songs
+                             playerViewModel.setPlaylist(playlistToPlay, 0)
+                         }
+                     },
+                     onSongClick = { song: com.tinsic.app.data.model.Song, playlist: List<com.tinsic.app.data.model.Song> ->
+                         val startIndex = playlist.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                         playerViewModel.setPlaylist(playlist, startIndex)
+                     },
+                     playerViewModel = playerViewModel,
+                     onPlayerExpand = { showPlayer = true }
+                 )
             }
         }
     }
@@ -172,14 +218,12 @@ fun MainScaffold(
     Scaffold(
         bottomBar = {
             Column {
-                // Show MiniPlayer ONLY on Home tab
-                if (currentRoute == Screen.Home.route) {
-                    MiniPlayer(
-                        viewModel = playerViewModel,
-                        onExpand = onPlayerExpand,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                // Show MiniPlayer on all main tabs
+                MiniPlayer(
+                    viewModel = playerViewModel,
+                    onExpand = onPlayerExpand,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 BottomNavigationBar(navController = navController)
             }
         }

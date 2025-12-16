@@ -6,7 +6,8 @@ data class Playlist(
     val userId: String = "",
     val songIds: List<String> = emptyList(),
     val coverUrl: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isDefault: Boolean = false
 ) {
-    constructor() : this("", "", "", emptyList(), "", 0L)
+    constructor() : this("", "", "", emptyList(), "", 0L, false)
 }

@@ -25,12 +25,14 @@ import coil.compose.AsyncImage
 import com.tinsic.app.data.model.Song
 import com.tinsic.app.ui.theme.CardBackground
 import com.tinsic.app.ui.theme.NeonPurple
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onSongClick: (Song) -> Unit,
-    onProfileClick: () -> Unit
+    onSongClick: (Song, List<Song>) -> Unit,
+    onProfileClick: () -> Unit,
+    onHistoryClick: () -> Unit
 ) {
     val songs by viewModel.songs.collectAsState()
     val selectedGenre by viewModel.selectedGenre.collectAsState()
@@ -42,7 +44,7 @@ fun HomeScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        HomeHeader(onProfileClick = onProfileClick)
+        HomeHeader(onProfileClick = onProfileClick, onHistoryClick = onHistoryClick)
 
         // Filter (bo phan nay)
         LazyRow(
@@ -81,8 +83,9 @@ fun HomeScreen(
                     SectionTitle("Quick Picks")
                 }
                 
-                items(viewModel.getQuickPicks()) { song ->
-                    SongListItem(song = song, onClick = { onSongClick(song) })
+                val quickPicks = viewModel.getQuickPicks()
+                items(quickPicks) { song ->
+                    SongListItem(song = song, onClick = { onSongClick(song, quickPicks) })
                 }
 
                 // Keep Listening Section
@@ -95,8 +98,9 @@ fun HomeScreen(
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(viewModel.getKeepListening()) { song ->
-                            KeepListeningCard(song = song, onClick = { onSongClick(song) })
+                        val keepListening = viewModel.getKeepListening()
+                        items(keepListening) { song ->
+                            KeepListeningCard(song = song, onClick = { onSongClick(song, keepListening) })
                         }
                     }
                 }
@@ -106,7 +110,7 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeHeader(onProfileClick: () -> Unit) {
+fun HomeHeader(onProfileClick: () -> Unit, onHistoryClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -125,7 +129,7 @@ fun HomeHeader(onProfileClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { /* History */ }) {
+            IconButton(onClick = onHistoryClick) {
                 Icon(
                     Icons.Default.History,
                     contentDescription = "History",
@@ -179,11 +183,17 @@ fun SongListItem(song: Song, onClick: () -> Unit) {
         ) {
             // Cover Image
             AsyncImage(
-                model = song.coverUrl,
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(song.coverUrl)
+                    .crossfade(true)
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .build(),
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.DarkGray), // Placeholder background
                 contentScale = ContentScale.Crop
             )
 
@@ -228,12 +238,18 @@ fun KeepListeningCard(song: Song, onClick: () -> Unit) {
     ) {
         Column {
             AsyncImage(
-                model = song.coverUrl,
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(song.coverUrl)
+                    .crossfade(true)
+                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                    .build(),
                 contentDescription = song.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .background(Color.DarkGray), // Placeholder background
                 contentScale = ContentScale.Crop
             )
             
