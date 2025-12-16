@@ -95,32 +95,10 @@ class PartyViewModel @Inject constructor(
         // Generate a random Room ID immediately when entering Lobby
         _roomId.value = generateRoomId()
         
-<<<<<<< HEAD
-        // Load current user from Firebase
+        // Load current user from Firebase (game feature)
         loadCurrentUser()
-    }
-    
-    private fun loadCurrentUser() {
-        viewModelScope.launch {
-            val userId = auth.currentUser?.uid
-            if (userId != null) {
-                userRepository.getUserById(userId).collect { user ->
-                    if (user != null) {
-                        // Update current user with real data
-                        _currentUser.value = PartyUser(
-                            id = userId,
-                            name = user.displayName,  // Fixed: displayName instead of name
-                            avatar = "👤", // Default avatar, can customize later
-                            color = Color(0xFF1DB954), // Spotify green
-                            score = 0
-                        )
-                        android.util.Log.d("PartyVM", "Loaded user: ${user.displayName}")
-                    }
-                }
-            } else {
-                android.util.Log.w("PartyVM", "No authenticated user, using Guest")
-=======
-        // --- SYNC ENGINE LOGIC ---
+        
+        // --- SYNC ENGINE LOGIC (karaoke feature) ---
         
         // ResourceLoader logic moved to KaraokePartyController
         // Game mode will have its own GameController for loading game-specific resources
@@ -208,6 +186,31 @@ class PartyViewModel @Inject constructor(
     
     // Expose server time to UI
     fun getServerTime(): Long = partyRepository.getServerTime()
+    
+    // --- USER MANAGEMENT (Game feature) ---
+    
+    private fun loadCurrentUser() {
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid
+            if (userId != null) {
+                userRepository.getUserById(userId).collect { user ->
+                    if (user != null) {
+                        // Update current user with real data
+                        _currentUser.value = PartyUser(
+                            id = userId,
+                            name = user.displayName,
+                            avatar = "👤",
+                            color = Color(0xFF1DB954), // Spotify green
+                            score = 0
+                        )
+                        android.util.Log.d("PartyVM", "Loaded user: ${user.displayName}")
+                    }
+                }
+            } else {
+                android.util.Log.w("PartyVM", "No authenticated user, using Guest")
+            }
+        }
+    }
 
     // --- REALTIME LOGIC ---
     

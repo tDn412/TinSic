@@ -304,6 +304,20 @@ class PartyRepository @Inject constructor(
             Result.failure(e)
         }
     }
+     * Called by GameViewModel when player answers questions
+     */
+    suspend fun updatePlayerScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("members").child(userId)
+                .child("score").setValue(newScore).await()
+            android.util.Log.d("PartyRepo", "Updated score for $userId: $newScore")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}")
+            Result.failure(e)
+        }
+    }
     
     /**
      * Update playing status for a specific player
