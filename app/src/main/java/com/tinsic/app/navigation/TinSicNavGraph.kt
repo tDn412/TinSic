@@ -215,15 +215,28 @@ fun MainScaffold(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
+    // Get PartyViewModel to check mode (only if on Party route)
+    val partyViewModel: com.tinsic.app.presentation.party.PartyViewModel? = 
+        if (currentRoute == Screen.Party.route) {
+            hiltViewModel()
+        } else null
+    
+    val partyMode by (partyViewModel?.mode ?: remember { mutableStateOf(com.tinsic.app.presentation.party.PartyModeState.LOBBY) }).collectAsState()
+    
+    // Hide MiniPlayer when in Party Room mode
+    val showMiniPlayer = !(currentRoute == Screen.Party.route && partyMode == com.tinsic.app.presentation.party.PartyModeState.ROOM)
+    
     Scaffold(
         bottomBar = {
             Column {
-                // Show MiniPlayer on all main tabs
-                MiniPlayer(
-                    viewModel = playerViewModel,
-                    onExpand = onPlayerExpand,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Show MiniPlayer on all main tabs EXCEPT Party Room mode
+                if (showMiniPlayer) {
+                    MiniPlayer(
+                        viewModel = playerViewModel,
+                        onExpand = onPlayerExpand,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 BottomNavigationBar(navController = navController)
             }
         }

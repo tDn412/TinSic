@@ -54,20 +54,18 @@ fun PartyScreen(
             }
         }
     }
-    
-    // Navigate to full-screen PartyRoom when entering GAME mode (to hide MiniPlayer)
-    LaunchedEffect(mode, roomType) {
-        if (mode == PartyModeState.ROOM && roomType == "GAME" && !isRoomMode) {
-            android.util.Log.d("PartyScreen", "Navigating to full-screen Game Room")
-            onStartSession() // Navigate to PartyRoom route (no MainScaffold)
-        }
-    }
 
     // --- NAVIGATION LOGIC ---
     // REMOVED: Conflicting navigation logic.
     // PartyScreen will handle the transition locally via 'when(mode)'
     // This prevents the 'State Loop' bug where Navigation Stack holds a stale ROOM state.
     /*
+    LaunchedEffect(mode, roomType) {
+        if (mode == PartyModeState.ROOM && roomType == "GAME" && !isRoomMode) {
+            onStartSession() // Navigate to PartyRoom route
+        }
+    }
+    
     LaunchedEffect(mode) {
         if (mode == PartyModeState.ROOM && !isRoomMode) {
              onStartSession() // Navigate to Immersive Screen (PartyRoom route)
