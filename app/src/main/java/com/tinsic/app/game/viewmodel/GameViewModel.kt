@@ -123,16 +123,16 @@ class GameViewModel @javax.inject.Inject constructor(
     
     /**
      * Handle game session updates from Firebase
-     * Clients react to host's commands, host can also listen for consistency
+     * ALL PLAYERS (Host + Clients) sync to this Source of Truth
      */
     private fun handleGameSessionUpdate(session: com.tinsic.app.data.model.GameSession) {
-        android.util.Log.d("GameViewModel", "GameSession update: phase=${session.phase}, questionIndex=${session.currentQuestionIndex}, timeLeft=${session.timeLeft}, isHost=$isHost")
+        android.util.Log.d("GameViewModel", "SYNC: Processing update phase=${session.phase}, index=${session.currentQuestionIndex}, isHost=$isHost")
         
-        // Skip if we're the host and already updated locally (avoid double-update)
-        // Host updates Firebase, no need to react to own changes
-        if (isHost) return
+        // REMOVED: if (isHost) return
+        // Reason: Host should also sync to Firebase to prevent "Split Brain" state 
+        // where Firebase is updated but local UI failed to transition.
         
-        // CLIENT LOGIC: Sync with host's game state
+        // Logic: Sync with global game state
         when (session.phase) {
             "COUNTDOWN" -> {
                 // Host countdown - sync timer continuously

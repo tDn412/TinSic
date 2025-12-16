@@ -48,20 +48,18 @@ fun GameRoomScreen(
     // Set roomId for Firebase sync
     LaunchedEffect(roomId) {
         if (roomId.isNotEmpty()) {
+            android.util.Log.d("GameRoomScreen", "Connecting to Room: $roomId")
             gameViewModel.setRoomId(roomId)
-            android.util.Log.d("GameRoomScreen", "Set roomId in GameViewModel: $roomId")
         }
     }
     
-    // Determine and set host status from PartyViewModel
-    LaunchedEffect(Unit) {
-        // Get hostId from PartyViewModel (assumption: stored in PartyRoom)
-        partyViewModel.connectedUsers.collect { users ->
-            // First user is typically the host, or you can get from PartyRoom.hostId
-            val hostId = users.firstOrNull()?.id ?: ""
-            if (hostId.isNotEmpty()) {
-                gameViewModel.setIsHost(hostId)
-            }
+    // Determine and set host status from PartyViewModel dynamically
+    // This ensures if you become host (or host leaves), permissions update
+    LaunchedEffect(partyUsers) {
+        val hostId = partyUsers.firstOrNull()?.id ?: ""
+        if (hostId.isNotEmpty()) {
+            android.util.Log.d("GameRoomScreen", "Updating Host Status: CurrentUser=${currentUser.id}, Host=$hostId")
+            gameViewModel.setIsHost(hostId)
         }
     }
     
