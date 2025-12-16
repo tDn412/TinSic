@@ -194,8 +194,14 @@ class GameViewModel @javax.inject.Inject constructor(
             
             // Filter and order questions to match host's question IDs
             val orderedQuestions = session.questionIds.mapNotNull { questionIdStr ->
-                val questionId = questionIdStr.toIntOrNull() ?: return@mapNotNull null
-                allQuestions.find { it.id == questionId }
+                // Try parsing as Int (direct ID) first, OR matches String representation of Int ID
+                val allQuestionsMap = allQuestions.associateBy { it.id.toString() }
+                val question = allQuestionsMap[questionIdStr]
+                
+                if (question == null) {
+                    android.util.Log.w("GameViewModel", "WARNING: Could not find question with ID: $questionIdStr")
+                }
+                question
             }
             
             _uiState.value = _uiState.value.copy(
@@ -203,7 +209,7 @@ class GameViewModel @javax.inject.Inject constructor(
                 questions = orderedQuestions
             )
             
-            android.util.Log.d("GameViewModel", "CLIENT: Loaded ${orderedQuestions.size} questions in sync with host")
+            android.util.Log.d("GameViewModel", "CLIENT: Loaded ${orderedQuestions.size} questions. IDs: ${orderedQuestions.map { it.id }}")
         } catch (e: Exception) {
             android.util.Log.e("GameViewModel", "CLIENT: Failed to load questions: ${e.message}")
         }
