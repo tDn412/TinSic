@@ -114,13 +114,82 @@ class GameViewModel @javax.inject.Inject constructor(
     
     /**
      * Handle game session updates from Firebase
-     * Clients react to host's commands, host ignores (already updated locally)
+     * Clients react to host's commands, host can also listen for consistency
      */
     private fun handleGameSessionUpdate(session: com.tinsic.app.data.model.GameSession) {
-        android.util.Log.d("GameViewModel", "GameSession update: phase=${session.phase}, questionIndex=${session.currentQuestionIndex}, timeLeft=${session.timeLeft}")
+        android.util.Log.d("GameViewModel", "GameSession update: phase=${session.phase}, questionIndex=${session.currentQuestionIndex}, timeLeft=${session.timeLeft}, isHost=$isHost")
         
-        // TODO: Sync UI based on session phase
-        // Will implement in next step
+        // Skip if we're the host and already updated locally (avoid double-update)
+        // Host updates Firebase, no need to react to own changes
+        if (isHost) return
+        
+        // CLIENT LOGIC: Sync with host's game state
+        when (session.phase) {
+            "COUNTDOWN" -> {
+                // Host started countdown
+                if (_uiState.value.currentScreen != GameScreenState.COUNTDOWN) {
+                    _uiState.value = _uiState.value.copy(
+                        currentScreen = GameScreenState.COUNTDOWN,
+                        countdownTime = session.timeLeft
+                    )
+                    android.util.Log.d("GameViewModel", "CLIENT: Synced to COUNTDOWN phase")
+                }
+            }
+            "PLAYING" -> {
+                // Game started, load questions if needed
+                if (_uiState.value.questions.isEmpty() && session.questionIds.isNotEmpty()) {
+                    // Load questions based on host's question IDs
+                    viewModelScope.launch {
+                        loadQuestionsFromSession(session)
+                    }
+                }
+                
+                // Sync current question and timer
+                _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.PLAYING,
+                    currentQuestionIndex = session.currentQuestionIndex,
+                    timeLeft = session.timeLeft
+                )
+                android.util.Log.d("GameViewModel", "CLIENT: Synced to PLAYING phase, question ${session.currentQuestionIndex}")
+            }
+            "ANSWER_REVEAL" -> {
+                // Host revealed answer
+                _uiState.value = _uiState.value.copy(
+                    currentScreen = GameScreenState.PLAYING,
+                    isAnswerRevealed = true
+                )
+                android.util.Log.d("GameViewModel", "CLIENT: Answer revealed")
+            }
+            else -> {
+                android.util.Log.d("GameViewModel", "CLIENT: Unknown phase ${session.phase}")
+            }
+        }
+    }
+    
+    /**
+     * Load questions from Firebase based on session questionIds
+     * Called by CLIENTS when host starts game
+     */
+    private suspend fun loadQuestionsFromSession(session: com.tinsic.app.data.model.GameSession) {
+        try {
+            val gameType = com.tinsic.app.game.model.GameType.valueOf(session.gameType)
+            val allQuestions = gameRepository.getQuestionsByType(gameType)
+            
+            // Filter and order questions to match host's question IDs
+            val orderedQuestions = session.questionIds.mapNotNull { questionIdStr ->
+                val questionId = questionIdStr.toIntOrNull() ?: return@mapNotNull null
+                allQuestions.find { it.id == questionId }
+            }
+            
+            _uiState.value = _uiState.value.copy(
+                selectedGameType = gameType,
+                questions = orderedQuestions
+            )
+            
+            android.util.Log.d("GameViewModel", "CLIENT: Loaded ${orderedQuestions.size} questions in sync with host")
+        } catch (e: Exception) {
+            android.util.Log.e("GameViewModel", "CLIENT: Failed to load questions: ${e.message}")
+        }
     }
 
     fun selectGame(type: GameType) {
@@ -131,54 +200,75 @@ class GameViewModel @javax.inject.Inject constructor(
                 error = null
             )
             
-            try {
-                // Fetch questions from Firebase
-                val allQuestions = gameRepository.getQuestionsByType(type)
-                val filteredQuestions = allQuestions.shuffled().take(5)
-                
-                if (filteredQuestions.isEmpty()) {
+            if (isHost) {
+                // === HOST LOGIC: Load questions and create Firebase game session ===
+                try {
+                    // Fetch questions from Firebase
+                    val allQuestions = gameRepository.getQuestionsByType(type)
+                    val filteredQuestions = allQuestions.shuffled().take(5)
+                    
+                    if (filteredQuestions.isEmpty()) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "Không tìm thấy câu hỏi cho game này. Vui lòng thử lại sau."
+                        )
+                        return@launch
+                    }
+
+                    // Initialize player scores from already-set players (via setPlayers)
+                    val initialPlayerScores = _uiState.value.playerScores.ifEmpty {
+                        // Fallback if setPlayers wasn't called
+                        listOf(
+                            PlayerScore(
+                                playerId = currentPlayerId,
+                                playerName = "You",
+                                score = 0,
+                                answeredCorrectly = false,
+                                isCurrentPlayer = true
+                            )
+                        )
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        selectedGameType = type,
+                        questions = filteredQuestions,
+                        currentScreen = GameScreenState.COUNTDOWN,
+                        score = 0,
+                        streak = 0,
+                        countdownTime = 5,
+                        isGameOver = false,
+                        mockPlayers = emptyList(), // No more AI players
+                        playerScores = initialPlayerScores,
+                        isLoading = false,
+                        error = null
+                    )
+                    
+                    // Create game session in Firebase for all players to sync
+                    val questionIds = filteredQuestions.map { it.id.toString() }
+                    partyRepository.startGameSession(
+                        roomId = currentRoomId,
+                        hostId = currentPlayerId,
+                        gameType = type.name,
+                        questionIds = questionIds
+                    )
+                    
+                    android.util.Log.d("GameViewModel", "HOST: Started game session for ${filteredQuestions.size} questions")
+                    
+                    startCountdown()
+                } catch (e: Exception) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Không tìm thấy câu hỏi cho game này. Vui lòng thử lại sau."
-                    )
-                    return@launch
-                }
-
-
-                // Initialize player scores from already-set players (via setPlayers)
-                val initialPlayerScores = _uiState.value.playerScores.ifEmpty {
-                    // Fallback if setPlayers wasn't called
-                    listOf(
-                        PlayerScore(
-                            playerId = currentPlayerId,
-                            playerName = "You",
-                            score = 0,
-                            answeredCorrectly = false,
-                            isCurrentPlayer = true
-                        )
+                        error = "Lỗi khi tải câu hỏi: ${e.message}. Vui lòng kiểm tra kết nối internet."
                     )
                 }
-
-                _uiState.value = _uiState.value.copy(
-                    selectedGameType = type,
-                    questions = filteredQuestions,
-                    currentScreen = GameScreenState.COUNTDOWN,
-                    score = 0,
-                    streak = 0,
-                    countdownTime = 5,
-                    isGameOver = false,
-                    mockPlayers = emptyList(), // No more AI players
-                    playerScores = initialPlayerScores,
-                    isLoading = false,
-                    error = null
-                )
-
-                startCountdown()
-            } catch (e: Exception) {
+            } else {
+                // === CLIENT LOGIC: Wait for host to start game ===
+                android.util.Log.d("GameViewModel", "CLIENT: Waiting for host to start game...")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Lỗi khi tải câu hỏi: ${e.message}. Vui lòng kiểm tra kết nối internet."
+                    selectedGameType = type
                 )
+                // handleGameSessionUpdate will be called when host starts the game
             }
         }
     }
