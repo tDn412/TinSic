@@ -19,7 +19,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PartyViewModel @Inject constructor(
-    private val partyRepository: PartyRepository
+    private val partyRepository: PartyRepository,
+    private val auth: com.google.firebase.auth.FirebaseAuth,
+    private val userRepository: com.tinsic.app.data.repository.UserRepository
 ) : ViewModel() {
 
     // --- STATES ---
@@ -36,7 +38,7 @@ class PartyViewModel @Inject constructor(
     private val _stageUsers = MutableStateFlow<List<PartyUser>>(emptyList())
     val stageUsers: StateFlow<List<PartyUser>> = _stageUsers.asStateFlow()
 
-    // Current User (Defaults to a guests until logged in or identified)
+    // Current User (Will be loaded from Firestore)
     private val _currentUser = MutableStateFlow(
         PartyUser(
             id = "user_${Random.nextInt(1000, 9999)}",
@@ -64,6 +66,32 @@ class PartyViewModel @Inject constructor(
     init {
         // Generate a random Room ID immediately when entering Lobby
         _roomId.value = generateRoomId()
+        
+        // Load current user from Firebase
+        loadCurrentUser()
+    }
+    
+    private fun loadCurrentUser() {
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid
+            if (userId != null) {
+                userRepository.getUserById(userId).collect { user ->
+                    if (user != null) {
+                        // Update current user with real data
+                        _currentUser.value = PartyUser(
+                            id = userId,
+                            name = user.name,
+                            avatar = "👤", // Default avatar, can customize later
+                            color = Color(0xFF1DB954), // Spotify green
+                            score = 0
+                        )
+                        android.util.Log.d("PartyVM", "Loaded user: ${user.name}")
+                    }
+                }
+            } else {
+                android.util.Log.w("PartyVM", "No authenticated user, using Guest")
+            }
+        }
     }
 
     private fun generateRoomId(): String {
