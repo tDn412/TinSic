@@ -53,6 +53,18 @@ fun GameRoomScreen(
         }
     }
     
+    // Determine and set host status from PartyViewModel
+    LaunchedEffect(Unit) {
+        // Get hostId from PartyViewModel (assumption: stored in PartyRoom)
+        partyViewModel.connectedUsers.collect { users ->
+            // First user is typically the host, or you can get from PartyRoom.hostId
+            val hostId = users.firstOrNull()?.id ?: ""
+            if (hostId.isNotEmpty()) {
+                gameViewModel.setIsHost(hostId)
+            }
+        }
+    }
+    
     // Stop music and hide MiniPlayer when entering Game Room
     DisposableEffect(Unit) {
         android.util.Log.d("GameRoomScreen", "Stopping music and clearing MiniPlayer")

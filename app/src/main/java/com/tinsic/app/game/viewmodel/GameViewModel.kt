@@ -46,6 +46,9 @@ class GameViewModel @javax.inject.Inject constructor(
     // Track current player ID and room ID for Firebase sync
     private var currentPlayerId: String = ""
     private var currentRoomId: String = ""
+    private var isHost: Boolean = false  // Is this player the game host?
+    
+    private var gameSessionObserverJob: kotlinx.coroutines.Job? = null
     
     /**
      * Inject real players from PartyViewModel
@@ -73,12 +76,51 @@ class GameViewModel @javax.inject.Inject constructor(
     }
     
     /**
-     * Set room ID for Firebase sync
+     * Set room ID and determine if this player is HOST
      * Called from GameRoomScreen after PartyViewModel provides roomId
      */
     fun setRoomId(roomId: String) {
         currentRoomId = roomId
         android.util.Log.d("GameViewModel", "RoomId set: $roomId")
+        
+        // Start observing game session for synchronization
+        startObservingGameSession()
+    }
+    
+    /**
+     * Set host status - called from GameRoomScreen based on PartyViewModel.currentUser
+     */
+    fun setIsHost(hostId: String) {
+        isHost = (currentPlayerId == hostId)
+        android.util.Log.d("GameViewModel", "Host status: isHost=$isHost (currentPlayer=$currentPlayerId, host=$hostId)")
+    }
+    
+    /**
+     * Start observing game session changes from Firebase
+     * ALL players (host + clients) listen and react
+     */
+    private fun startObservingGameSession() {
+        if (currentRoomId.isEmpty()) return
+        
+        gameSessionObserverJob?.cancel()
+        gameSessionObserverJob = viewModelScope.launch {
+            partyRepository.observeGameSession(currentRoomId).collect { session ->
+                if (session != null && session.isActive) {
+                    handleGameSessionUpdate(session)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle game session updates from Firebase
+     * Clients react to host's commands, host ignores (already updated locally)
+     */
+    private fun handleGameSessionUpdate(session: com.tinsic.app.data.model.GameSession) {
+        android.util.Log.d("GameViewModel", "GameSession update: phase=${session.phase}, questionIndex=${session.currentQuestionIndex}, timeLeft=${session.timeLeft}")
+        
+        // TODO: Sync UI based on session phase
+        // Will implement in next step
     }
 
     fun selectGame(type: GameType) {
