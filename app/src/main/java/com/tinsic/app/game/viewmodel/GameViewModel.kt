@@ -156,6 +156,14 @@ class GameViewModel @javax.inject.Inject constructor(
     fun startGame() {
         val gameType = _uiState.value.selectedGameType
         
+        // === FIREBASE SYNC: Set playing = true ===
+        if (currentRoomId.isNotEmpty() && currentPlayerId.isNotEmpty()) {
+            viewModelScope.launch {
+                partyRepository.updatePlayerPlayingStatus(currentRoomId, currentPlayerId, true)
+                android.util.Log.d("GameViewModel", "Set playing = true in Firebase")
+            }
+        }
+        
         // Only GUESS_THE_SONG starts with music preview phase
         if (gameType == GameType.GUESS_THE_SONG) {
             _uiState.value = _uiState.value.copy(
@@ -201,6 +209,14 @@ class GameViewModel @javax.inject.Inject constructor(
     }
 
     fun backToMenu() {
+        // === FIREBASE SYNC: Set playing = false ===
+        if (currentRoomId.isNotEmpty() && currentPlayerId.isNotEmpty()) {
+            viewModelScope.launch {
+                partyRepository.updatePlayerPlayingStatus(currentRoomId, currentPlayerId, false)
+                android.util.Log.d("GameViewModel", "Set playing = false in Firebase")
+            }
+        }
+        
         _uiState.value = GameUiState(currentScreen = GameScreenState.MENU, highScore = _uiState.value.highScore)
     }
     
