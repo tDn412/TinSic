@@ -42,6 +42,10 @@ fun PartyScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val roomId by viewModel.roomId.collectAsState()
     val roomType by viewModel.roomType.collectAsState()
+    
+    // Sync Engine States
+    val playbackState by viewModel.playbackState.collectAsState()
+    val startTime by viewModel.startTime.collectAsState()
 
     // Force mode if entered directly (Run ONCE on entry Only)
     LaunchedEffect(Unit) {
@@ -117,23 +121,52 @@ fun PartyScreen(
                         }
                     }
                 } else {
+                    val searchResults by viewModel.searchResults.collectAsState()
+                    
+                    // Inject KaraokeController for karaoke-specific logic
+                    val karaokeController: com.tinsic.app.presentation.party.karaoke.KaraokePartyController = 
+                        androidx.hilt.navigation.compose.hiltViewModel()
+                    
+                    // Wire resource loading logic
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.flow.combine(
+                            viewModel.playbackState,
+                            viewModel.currentSongId,
+                            viewModel.queueWithUrls
+                        ) { state, songId, queueMap ->
+                            Triple(state, songId, queueMap)
+                        }.collect { (state, songId, queueMap) ->
+                            if (state == "LOADING" && songId.isNotEmpty()) {
+                                val song = queueMap[songId]
+                                if (song != null) {
+                                    // Delegate to KaraokeController
+                                    karaokeController.loadSongResources(song, roomId, currentUser.id)
+                                }
+                            }
+                        }
+                    }
+                    
                     ActivePartyRoom(
                         roomId = roomId,
                         users = users,
-                        stageUsers = stageUsers, // Pass stage users
-                        currentUser = currentUser, // Pass current user
+                        stageUsers = stageUsers,
+                        currentUser = currentUser,
                         queue = queue,
                         searchQuery = searchQuery,
+                        searchResults = searchResults, // Pass results
+                        playbackState = playbackState, // NEW
+                        startTime = startTime, // NEW
+                        partyViewModel = viewModel, // Core party logic
+                        karaokeController = karaokeController, // Karaoke-specific logic
                         onSearchQueryChange = { viewModel.setSearchQuery(it) },
                         onRemoveSong = { viewModel.removeSong(it) },
+                        onAddSong = { viewModel.addSongToQueue(it) }, // Pass Add action
                         onLeaveRoom = {
-                            // 1. Send Leave command to Firebase
                             viewModel.leaveRoom()
-                            // 2. Navigate back
                             onLeaveSession() 
                         },
-                        onToggleStage = { viewModel.toggleStageJoin() }, // Action to join/leave stage
-                        onStartSong = { /* Logic to start song */ }
+                        onToggleStage = { viewModel.toggleStageJoin() },
+                        onStartSong = { songId -> viewModel.startSong(songId) } // Wire to ViewModel
                     )
                 }
             }
@@ -383,264 +416,3 @@ fun PartyTypeOption(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ActivePartyRoom(
-    roomId: String,
-    users: List<PartyUser>,
-    stageUsers: List<PartyUser>, // New Param
-    currentUser: PartyUser,      // New Param
-    queue: List<PartySong>,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    onRemoveSong: (Int) -> Unit,
-    onLeaveRoom: () -> Unit,
-    onToggleStage: () -> Unit, // Changed from onJoinStage
-    onStartSong: () -> Unit     // New Param
-) {
-    var showMembersSheet by remember { mutableStateOf(false) }
-
-    // Check if current user is on stage
-    val isOnStage = stageUsers.any { it.id == currentUser.id }
-
-    Scaffold(
-        containerColor = Color.Transparent, // Using parent gradient
-        topBar = {
-            // Custom Header with Search
-            Row(
-                modifier = Modifier
-                    .padding(top = 48.dp, start = 24.dp, end = 24.dp, bottom = 24.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search Bar
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x0DFFFFFF)) // White/5
-                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = if (searchQuery.isEmpty()) "Search songs..." else searchQuery,
-                            color = if (searchQuery.isEmpty()) Color.Gray else Color.White
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // User Badge
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(Color(0xFFFF00FF), Color(0xFF00FFFF))))
-                        .clickable { showMembersSheet = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Group, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        Text("${users.size}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            // THE STAGE
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0x1AFF00FF), Color(0x1A00FFFF)) // 10% opacity colors
-                        )
-                    )
-                    .border(
-                        2.dp,
-                        Brush.linearGradient(listOf(Color(0x4DFF00FF), Color(0x4D00FFFF))),
-                        RoundedCornerShape(24.dp)
-                    )
-                    .clickable { onToggleStage() } // Click to Join/Leave
-                    .padding(24.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("🎤 The Stage", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    
-                    val stageText = if (isOnStage) "Tap to leave stage" else "Tap to join the performance"
-                    Text(stageText, color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 24.dp))
-                    
-                    // Render Stage Slots (Max 2)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(32.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Render confirmed singers
-                        stageUsers.forEach { singer ->
-                            SingerAvatar(singer)
-                        }
-
-                        // Render Empty Slots if any
-                        repeat(2 - stageUsers.size) {
-                             Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x1AFFFFFF)) // White/10
-                                    .border(2.dp, Color(0x33FFFFFF), CircleShape), // White/20
-                                contentAlignment = Alignment.Center
-                             ) {
-                                 Icon(Icons.Default.Add, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(32.dp))
-                             }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // QUEUE
-            Text(
-                text = "Up Next",
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-            )
-
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                itemsIndexed(queue) { index, song ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0x0DFFFFFF)) // White/5
-                            .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Index Badge
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Color(0xFFFF00FF), Color(0xFF00FFFF)))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("${index + 1}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(song.artist, color = Color.Gray, fontSize = 14.sp, maxLines = 1)
-                        }
-
-                        // Logic: Chỉ hiện nút Mic nếu TÔI đang ở trên STAGE
-                        if (isOnStage) {
-                            IconButton(
-                                onClick = { onStartSong() },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(
-                                        Brush.linearGradient(listOf(Color(0xFFFF00FF), Color(0xFF00FFFF))),
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            }
-                        } else {
-                            // Nếu không ở trên stage thì không hiện mic (hoặc có thể hiện icon khóa - Optional)
-                        }
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Nút Xóa bài (Ai cũng thấy được)
-                        IconButton(
-                            onClick = { onRemoveSong(song.id) },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color(0x33EF4444), CircleShape) // Red/20
-                                .border(1.dp, Color(0x4DEF4444), CircleShape)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFF87171), modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Members Bottom Sheet
-    if (showMembersSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showMembersSheet = false },
-            containerColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
-        ) {
-            // Existing BottomSheet Content... (Kept same as before)
-            // For brevity, using simplified version if full content not needed here, 
-            // but in real code, paste the full bottom sheet content from previous step.
-             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Members List", fontSize = 24.sp, color = Color.White)
-                // ... (Previous implementation details)
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = onLeaveRoom) { Text("Leave Room") }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun SingerAvatar(singer: PartyUser) {
-    Box(contentAlignment = Alignment.BottomCenter) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .border(4.dp, Color(0x33FFFFFF), CircleShape)
-                .background(Brush.linearGradient(listOf(singer.color, singer.color.copy(alpha = 0.9f)))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(singer.avatar, fontSize = 40.sp)
-        }
-        Surface(
-            modifier = Modifier.offset(y = 12.dp),
-            color = Color(0xCC000000), // Black/80
-            shape = CircleShape,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1AFFFFFF))
-        ) {
-            Text(
-                text = singer.name,
-                color = Color.White,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-            )
-        }
-    }
-}

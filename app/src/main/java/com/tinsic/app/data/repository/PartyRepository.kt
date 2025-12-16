@@ -17,6 +17,32 @@ import javax.inject.Singleton
 class PartyRepository @Inject constructor(
     private val realtimeDb: FirebaseDatabase
 ) {
+    
+    // Server time offset for accurate synchronization
+    private var serverTimeOffset: Long = 0L
+    
+    init {
+        // Calculate server time offset on initialization
+        estimateServerTimeOffset()
+    }
+    
+    private fun estimateServerTimeOffset() {
+        val offsetRef = realtimeDb.getReference(".info/serverTimeOffset")
+        offsetRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                serverTimeOffset = snapshot.getValue(Long::class.java) ?: 0L
+                android.util.Log.d("PartyRepo", "Server time offset: ${serverTimeOffset}ms")
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("PartyRepo", "Failed to get server offset: ${error.message}")
+            }
+        })
+    }
+    
+    // Get current server time (adjusted local time)
+    fun getServerTime(): Long {
+        return System.currentTimeMillis() + serverTimeOffset
+    }
 
     fun getPartyRoom(roomId: String): Flow<PartyRoom?> = callbackFlow {
         val reference = realtimeDb.getReference("parties").child(roomId)
@@ -107,10 +133,47 @@ class PartyRepository @Inject constructor(
         }
     }
 
-    suspend fun updatePlaybackState(roomId: String, isPlaying: Boolean): Result<Unit> {
+    // Deprecated: Old boolean-based playing flag (kept for backward compatibility)
+    suspend fun updatePlayingFlag(roomId: String, isPlaying: Boolean): Result<Unit> {
         return try {
             realtimeDb.getReference("parties").child(roomId)
                 .child("isPlaying").setValue(isPlaying).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Update playback state machine (for sync engine)
+    suspend fun updatePlaybackState(roomId: String, state: String, startTime: Long = 0L): Result<Unit> {
+        return try {
+            val updates = mapOf(
+                "status/playbackState" to state,
+                "status/startTime" to startTime
+            )
+            realtimeDb.getReference("parties").child(roomId).updateChildren(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Clear all ready states (called when starting new song)
+    suspend fun clearAllReadyStates(roomId: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("status/readyState").removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Set member ready state (resource loaded)
+    suspend fun setMemberReady(roomId: String, userId: String, isReady: Boolean): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("status/readyState").child(userId).setValue(isReady).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -194,6 +257,58 @@ class PartyRepository @Inject constructor(
                 .child("stage").child(userId).removeValue().await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // --- QUEUE FUNCTIONS ---
+
+    suspend fun addSongToQueue(roomId: String, song: com.tinsic.app.data.model.QueueSong): Result<Unit> {
+        return try {
+            // Use push() to generate unique ID for queue item (preserves order)
+            val queueRef = realtimeDb.getReference("parties").child(roomId).child("queue").push()
+            // Store the ID inside the object too for easier deletion
+            val songWithId = song.copy(id = queueRef.key ?: "")
+            queueRef.setValue(songWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeSongFromQueue(roomId: String, songKey: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("queue").child(songKey).removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    // --- SCORE FUNCTIONS ---
+    
+    /**
+     * Update member's score in Firebase
+     * Updates both members and stage if user is on stage
+     */
+    suspend fun updateMemberScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+        return try {
+            val updates = mutableMapOf<String, Any>()
+            
+            // Always update in members list
+            updates["members/$userId/score"] = newScore
+            
+            // Also update in stage if user is on stage
+            updates["stage/$userId/score"] = newScore
+            
+            realtimeDb.getReference("parties").child(roomId)
+                .updateChildren(updates).await()
+                
+            android.util.Log.d("PartyRepo", "Score updated: User=$userId, Score=$newScore")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}", e)
             Result.failure(e)
         }
     }

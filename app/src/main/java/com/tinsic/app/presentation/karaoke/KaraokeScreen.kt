@@ -35,12 +35,16 @@ import com.tinsic.app.presentation.karaoke.components.PitchVisualizer
 
 @Composable
 fun KaraokeScreen(
-    viewModel: KaraokeViewModel = hiltViewModel()
+    viewModel: KaraokeViewModel = hiltViewModel(),
+    onStopRequested: (() -> Unit)? = null  // Callback when user wants to stop (for Party Mode)
 ) {
     // Collect State from ViewModel
     val state by viewModel.uiState.collectAsState()
     val latencyOffset by viewModel.latencyOffset.collectAsState()
     val context = LocalContext.current
+    
+    // State for stop confirmation dialog
+    var showStopDialog by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -60,7 +64,8 @@ fun KaraokeScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) viewModel.toggleRecording()
+        // Permission granted, but toggleRecording is removed for Party Mode
+        // In Party Mode, karaoke starts automatically via startSinging()
     }
 
     // --- BACKGROUND GRADIENT (GRAVITY THEME) ---
@@ -172,31 +177,27 @@ fun KaraokeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { 
-                        if (!state.isRecording) {
-                            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            } else {
-                                viewModel.toggleRecording()
-                            }
-                        } else {
-                            viewModel.toggleRecording()
-                        }
-                    },
-                    modifier = Modifier
-                        .size(64.dp)
-                        .background(
-                            brush = Brush.linearGradient(listOf(Color(0xFF00E5FF), Color(0xFF2979FF))),
-                            shape = CircleShape
+                // Only show stop button when recording (Party Mode auto-starts)
+                if (state.isRecording) {
+                    IconButton(
+                        onClick = { showStopDialog = true },  // Show dialog instead of immediate stop
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(
+                                brush = Brush.linearGradient(listOf(Color(0xFFEF4444), Color(0xFFFB7185))),
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Stop",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
-                ) {
-                    Icon(
-                        imageVector = if (state.isRecording) Icons.Filled.Close else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isRecording) "Stop" else "Start",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    }
+                } else {
+                    // Placeholder to maintain layout
+                    Spacer(modifier = Modifier.size(64.dp))
                 }
 
                 Row(
@@ -221,6 +222,42 @@ fun KaraokeScreen(
                     }
                 }
             }
+        }
+        
+        // --- STOP CONFIRMATION DIALOG ---
+        if (showStopDialog) {
+            AlertDialog(
+                onDismissRequest = { showStopDialog = false },
+                title = {
+                    Text(
+                        "Dừng hát?",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                },
+                text = {
+                    Text("Bạn muốn dừng hát? Tất cả mọi người trong phòng sẽ trở về room.")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showStopDialog = false
+                            viewModel.stopSinging()  // Stop engine locally
+                            onStopRequested?.invoke() // Notify Party Mode to reset state
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF4444)
+                        )
+                    ) {
+                        Text("Dừng hát", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showStopDialog = false }) {
+                        Text("Huỷ")
+                    }
+                }
+            )
         }
     }
 }
