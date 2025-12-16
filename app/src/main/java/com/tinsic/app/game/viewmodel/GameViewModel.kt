@@ -378,6 +378,12 @@ class GameViewModel @javax.inject.Inject constructor(
             viewModelScope.launch {
                 partyRepository.updatePlayerPlayingStatus(currentRoomId, currentPlayerId, false)
                 android.util.Log.d("GameViewModel", "Set playing = false in Firebase")
+                
+                // HOST: End game session when returning to menu
+                if (isHost) {
+                    partyRepository.endGameSession(currentRoomId)
+                    android.util.Log.d("GameViewModel", "HOST: Ended game session")
+                }
             }
         }
         
