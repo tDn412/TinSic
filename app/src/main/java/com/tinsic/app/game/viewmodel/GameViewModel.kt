@@ -43,9 +43,6 @@ class GameViewModel @javax.inject.Inject constructor(
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState = _uiState.asStateFlow()
     
-    var currentQuestion: Question? = null
-        private set
-    
     // Track current player ID and room ID for Firebase sync
     private var currentPlayerId: String = ""
     private var currentRoomId: String = ""
