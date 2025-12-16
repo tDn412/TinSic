@@ -11,6 +11,13 @@ import coil.request.CachePolicy
 
 @HiltAndroidApp
 class TinSicApplication : Application(), ImageLoaderFactory {
+    
+    override fun onCreate() {
+        super.onCreate()
+        // Initialize SoundManager for game sound effects
+        com.tinsic.app.utils.SoundManager.initialize(this)
+    }
+    
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .crossfade(true)

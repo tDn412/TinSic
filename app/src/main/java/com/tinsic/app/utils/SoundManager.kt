@@ -34,33 +34,76 @@ object SoundManager {
                 .setAudioAttributes(audioAttributes)
                 .build()
             
-            // Temporarily disabled - no sound files yet
-            // App will work silently until sound files are added
-            correctSoundId = 0
-            wrongSoundId = 0
+            // Load sound files from res/raw
+            try {
+                correctSoundId = soundPool?.load(context, R.raw.correct, 1) ?: 0
+                android.util.Log.d("SoundManager", "Loaded correct.mp3 with ID: $correctSoundId")
+            } catch (e: Exception) {
+                android.util.Log.e("SoundManager", "Failed to load correct.mp3: ${e.message}")
+                correctSoundId = 0
+            }
+            
+            try {
+                wrongSoundId = soundPool?.load(context, R.raw.wrong, 1) ?: 0
+                android.util.Log.d("SoundManager", "Loaded wrong.mp3 with ID: $wrongSoundId")
+            } catch (e: Exception) {
+                android.util.Log.e("SoundManager", "Failed to load wrong.mp3: ${e.message}")
+                wrongSoundId = 0
+            }
             
             isInitialized = true
         } catch (e: Exception) {
+            android.util.Log.e("SoundManager", "Failed to initialize SoundPool: ${e.message}")
             e.printStackTrace()
         }
     }
     
     /**
-     * Play correct answer sound (currently disabled)
+     * Play correct answer sound
      */
     fun playCorrectSound() {
-        // Disabled - add correct.mp3 to res/raw to enable
-        // if (!isInitialized || soundPool == null || correctSoundId == 0) return
-        // soundPool?.play(correctSoundId, 0.5f, 0.5f, 1, 0, 1.0f)
+        if (!isInitialized || soundPool == null || correctSoundId == 0) {
+            android.util.Log.w("SoundManager", "Cannot play correct sound: initialized=$isInitialized, soundId=$correctSoundId")
+            return
+        }
+        
+        try {
+            soundPool?.play(
+                correctSoundId,
+                0.7f,  // Left volume
+                0.7f,  // Right volume
+                1,     // Priority
+                0,     // Loop (0 = no loop)
+                1.0f   // Playback rate
+            )
+            android.util.Log.d("SoundManager", "Playing correct sound")
+        } catch (e: Exception) {
+            android.util.Log.e("SoundManager", "Error playing correct sound: ${e.message}")
+        }
     }
     
     /**
-     * Play wrong answer sound (currently disabled)
+     * Play wrong answer sound
      */
     fun playWrongSound() {
-        // Disabled - add wrong.mp3 to res/raw to enable
-        // if (!isInitialized || soundPool == null || wrongSoundId == 0) return
-        // soundPool?.play(wrongSoundId, 0.5f, 0.5f, 1, 0, 1.0f)
+        if (!isInitialized || soundPool == null || wrongSoundId == 0) {
+            android.util.Log.w("SoundManager", "Cannot play wrong sound: initialized=$isInitialized, soundId=$wrongSoundId")
+            return
+        }
+        
+        try {
+            soundPool?.play(
+                wrongSoundId,
+                0.7f,  // Left volume
+                0.7f,  // Right volume
+                1,     // Priority
+                0,     // Loop (0 = no loop)
+                1.0f   // Playback rate
+            )
+            android.util.Log.d("SoundManager", "Playing wrong sound")
+        } catch (e: Exception) {
+            android.util.Log.e("SoundManager", "Error playing wrong sound: ${e.message}")
+        }
     }
     
     /**
@@ -70,5 +113,6 @@ object SoundManager {
         soundPool?.release()
         soundPool = null
         isInitialized = false
+        android.util.Log.d("SoundManager", "Released SoundPool")
     }
 }
