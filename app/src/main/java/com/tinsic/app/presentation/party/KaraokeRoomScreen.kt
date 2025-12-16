@@ -25,6 +25,9 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.tinsic.app.presentation.party.PartyUser
 import com.tinsic.app.presentation.party.PartySong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +41,8 @@ fun ActivePartyRoom(
     searchResults: List<com.tinsic.app.data.model.KaraokeSong>, // New Param
     playbackState: String, // NEW: For sync overlay
     startTime: Long, // NEW: For countdown
+    partyViewModel: PartyViewModel, // Core party logic
+    karaokeController: com.tinsic.app.presentation.party.karaoke.KaraokePartyController, // Karaoke-specific logic
     onSearchQueryChange: (String) -> Unit,
     onRemoveSong: (Int) -> Unit,
     onAddSong: (com.tinsic.app.data.model.KaraokeSong) -> Unit, // New Param
@@ -46,6 +51,21 @@ fun ActivePartyRoom(
     onStartSong: (String) -> Unit // Changed: Pass song ID
 ) {
     var showMembersSheet by remember { mutableStateOf(false) }
+    var showPermissionMessage by remember { mutableStateOf(false) }
+
+    // Permission handling for microphone access
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, proceed to join stage
+            onToggleStage()
+        } else {
+            // Permission denied, show message
+            showPermissionMessage = true
+        }
+    }
 
     // Check if current user is on stage
     val isOnStage = stageUsers.any { it.id == currentUser.id }
@@ -177,7 +197,27 @@ fun ActivePartyRoom(
                         Brush.linearGradient(listOf(Color(0x4DFF00FF), Color(0x4D00FFFF))),
                         RoundedCornerShape(24.dp)
                     )
-                    .clickable { onToggleStage() } // Click to Join/Leave
+                    .clickable { 
+                        // When joining stage, check permission first
+                        if (isOnStage) {
+                            // Already on stage, just leave
+                            onToggleStage()
+                        } else {
+                            // Trying to join stage - check permission
+                            val hasPermission = androidx.core.app.ActivityCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.RECORD_AUDIO
+                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                            
+                            if (hasPermission) {
+                                // Has permission, join stage directly
+                                onToggleStage()
+                            } else {
+                                // No permission, request it
+                                permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    } // Click to Join/Leave
                     .padding(24.dp)
             ) {
                 Column(
@@ -386,6 +426,76 @@ fun ActivePartyRoom(
                         }
                     }
                 }
+            }
+        }
+        
+        // --- FULLSCREEN OVERLAY: KARAOKE SCREEN ---
+        if (playbackState == "PLAYING") {
+            // Get both ViewModels
+            val karaokeViewModel: com.tinsic.app.presentation.karaoke.KaraokeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            val songNotes by karaokeController.currentSongNotes.collectAsState()  // From KaraokeController
+            val songLyrics by karaokeController.currentSongLyrics.collectAsState()  // From KaraokeController
+            
+            android.util.Log.d("KaraokeRoom", "[PLAYING] State entered. Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
+            
+            // Wire data to KaraokeViewModel when data is ready
+            LaunchedEffect(songNotes, songLyrics) {
+                if (songNotes.isNotEmpty() && songLyrics.isNotEmpty()) {
+                    android.util.Log.d("KaraokeRoom", "[DataWiring] ✅ Starting karaoke with ${songNotes.size} notes, ${songLyrics.size} lyrics")
+                    karaokeViewModel.startSinging(songNotes, songLyrics)
+                } else {
+                    android.util.Log.w("KaraokeRoom", "[DataWiring] ⚠️ Waiting for data... Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
+                }
+            }
+            
+            // Observe karaoke score and sync to Firebase
+            val karaokeUiState by karaokeViewModel.uiState.collectAsState()
+            
+            // Save score when leaving PLAYING state
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose {
+                    // User left PLAYING state (stopped or finished)
+                    val finalScore = karaokeUiState.currentScore
+                    if (finalScore > 0) {
+                        android.util.Log.d("KaraokeRoom", "[ScoreSync] Saving final score: $finalScore")
+                        // Use KaraokeController instead of PartyViewModel
+                        karaokeController.updateScore(roomId, currentUser.id, finalScore)
+                    }
+                }
+            }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(20f) // Above everything else
+            ) {
+                com.tinsic.app.presentation.karaoke.KaraokeScreen(
+                    viewModel = karaokeViewModel,
+                    onStopRequested = {
+                        // User confirmed stop → Reset state for everyone
+                        // Use KaraokeController instead of PartyViewModel
+                        karaokeController.endSongForAll(roomId)
+                    }
+                )
+            }
+        }
+        
+        // --- PERMISSION DENIED MESSAGE ---
+        if (showPermissionMessage) {
+            androidx.compose.material3.Snackbar(
+                modifier = Modifier.padding(16.dp),
+                action = {
+                    androidx.compose.material3.TextButton(onClick = { showPermissionMessage = false }) {
+                        androidx.compose.material3.Text("OK")
+                    }
+                },
+                dismissAction = {
+                    androidx.compose.material3.IconButton(onClick = { showPermissionMessage = false }) {
+                        androidx.compose.material3.Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            ) {
+                androidx.compose.material3.Text("Cần quyền mic để chấm điểm khi hát 🎤")
             }
         }
     }

@@ -52,6 +52,10 @@ class PartyViewModel @Inject constructor(
     private val _queue = MutableStateFlow<List<PartySong>>(emptyList())
     val queue: StateFlow<List<PartySong>> = _queue.asStateFlow()
 
+    // Full queue data with URLs (for resource loading)
+    private val _queueWithUrls = MutableStateFlow<Map<String, com.tinsic.app.data.model.QueueSong>>(emptyMap())
+    val queueWithUrls: StateFlow<Map<String, com.tinsic.app.data.model.QueueSong>> = _queueWithUrls.asStateFlow()
+
     // Search Results from Firestore (Karaoke Assets)
     private val _searchResults = MutableStateFlow<List<com.tinsic.app.data.model.KaraokeSong>>(emptyList())
     val searchResults: StateFlow<List<com.tinsic.app.data.model.KaraokeSong>> = _searchResults.asStateFlow()
@@ -80,33 +84,19 @@ class PartyViewModel @Inject constructor(
     private val _hostId = MutableStateFlow("")
     val hostId: StateFlow<String> = _hostId.asStateFlow()
 
+    // Karaoke-specific state (notes, lyrics) moved to KaraokePartyController
+
+    private val _currentSongId = MutableStateFlow("")
+    val currentSongId: StateFlow<String> = _currentSongId.asStateFlow()
+
     init {
         // Generate a random Room ID immediately when entering Lobby
         _roomId.value = generateRoomId()
         
         // --- SYNC ENGINE LOGIC ---
         
-        // SimulateDownload: When state changes to LOADING, auto-load resources
-        viewModelScope.launch {
-            playbackState.collect { state ->
-                if (state == "LOADING") {
-                    Log.d("PartyVM", "[SimulateDownload] State=LOADING, starting resource load...")
-                    Log.d("PartyVM", "[SimulateDownload] Current User: ${_currentUser.value.id}, Room: ${_roomId.value}")
-                    kotlinx.coroutines.delay(3000) // Simulate MP3/JSON download
-                    Log.d("PartyVM", "[SimulateDownload] Resource loaded! Setting ready...")
-                    
-                    // Fire and forget - don't wait for Firebase confirmation
-                    viewModelScope.launch {
-                        val result = partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
-                        if (result.isSuccess) {
-                            Log.d("PartyVM", "[SimulateDownload] ✅ Ready state updated successfully!")
-                        } else {
-                            Log.e("PartyVM", "[SimulateDownload] ❌ Failed to update ready state: ${result.exceptionOrNull()}")
-                        }
-                    }
-                }
-            }
-        }
+        // ResourceLoader logic moved to KaraokePartyController
+        // Game mode will have its own GameController for loading game-specific resources
 
         // HostControl: Monitor ready state and trigger countdown
         viewModelScope.launch {
@@ -156,30 +146,31 @@ class PartyViewModel @Inject constructor(
 
         // Countdown: Auto-transition to PLAYING when server countdown ends
         viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
-                playbackState,
-                startTime,
-                currentUser,
-                hostId
-            ) { state, start, user, currentHostId ->
-                if (state != "COUNTDOWN") return@combine
-                if (start == 0L) return@combine
-                
-                // Only host triggers the transition
-                if (user.id == currentHostId) {
-                    val serverNow = partyRepository.getServerTime()
-                    val timeLeft = start - serverNow
-                    
-                    Log.d("PartyVM", "[Countdown] Time left: ${timeLeft}ms (server time)")
-                    
-                    if (timeLeft <= 0) {
-                        Log.d("PartyVM", "[Countdown] Finished! Transitioning to PLAYING...")
-                        partyRepository.updatePlaybackState(_roomId.value, "PLAYING", 0L)
-                    } else {
-                        kotlinx.coroutines.delay(timeLeft.coerceAtMost(5000) + 100)
+            playbackState.collect { state ->
+                if (state == "COUNTDOWN") {
+                    // Only host triggers the transition
+                    if (_currentUser.value.id == _hostId.value) {
+                        Log.d("PartyVM", "[Countdown] Starting countdown monitor...")
+                        
+                        // Loop until countdown ends
+                        while (_playbackState.value == "COUNTDOWN") {
+                            val serverNow = partyRepository.getServerTime()
+                            val timeLeft = _startTime.value - serverNow
+                            
+                            Log.d("PartyVM", "[Countdown] Time left: ${timeLeft}ms (server time)")
+                            
+                            if (timeLeft <= 0) {
+                                Log.d("PartyVM", "[Countdown] Finished! Transitioning to PLAYING...")
+                                partyRepository.updatePlaybackState(_roomId.value, "PLAYING", 0L)
+                                break
+                            }
+                            
+                            // Check every 100ms for accuracy
+                            kotlinx.coroutines.delay(100)
+                        }
                     }
                 }
-            }.collect { }
+            }
         }
     }
 
@@ -243,6 +234,7 @@ class PartyViewModel @Inject constructor(
 
                     // Update Queue (Map to List sorted by timestamp or natural order)
                     // Note: Firebase push keys are time-ordered essentially.
+                    _queueWithUrls.value = room.queue // Store full data with URLs
                     val queueList = room.queue.values.map { item ->
                         PartySong(
                             id = item.id.hashCode(), // Int ID for UI compatibility (temporary)
@@ -263,6 +255,12 @@ class PartyViewModel @Inject constructor(
                     _startTime.value = room.status.startTime
                     _readyState.value = room.status.readyState
                     _hostId.value = room.hostId // Update host ID
+                    
+                    // Track current song ID
+                    if (_currentSongId.value != room.currentSongId && room.currentSongId.isNotEmpty()) {
+                        _currentSongId.value = room.currentSongId
+                        Log.d("PartyVM", "[StateSync] currentSongId updated: ${room.currentSongId}")
+                    }
                     
                     // Log state changes
                     if (oldState != room.status.playbackState) {
@@ -472,4 +470,7 @@ class PartyViewModel @Inject constructor(
             partyRepository.updateCurrentSong(_roomId.value, songId)
         }
     }
+
+    // Karaoke-specific functions (loadSongResources, updateScore, endSongForAll)
+    // have been moved to KaraokePartyController for better separation of concerns
 }

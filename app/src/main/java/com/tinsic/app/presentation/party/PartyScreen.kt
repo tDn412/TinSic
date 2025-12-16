@@ -123,6 +123,29 @@ fun PartyScreen(
                 } else {
                     val searchResults by viewModel.searchResults.collectAsState()
                     
+                    // Inject KaraokeController for karaoke-specific logic
+                    val karaokeController: com.tinsic.app.presentation.party.karaoke.KaraokePartyController = 
+                        androidx.hilt.navigation.compose.hiltViewModel()
+                    
+                    // Wire resource loading logic
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.flow.combine(
+                            viewModel.playbackState,
+                            viewModel.currentSongId,
+                            viewModel.queueWithUrls
+                        ) { state, songId, queueMap ->
+                            Triple(state, songId, queueMap)
+                        }.collect { (state, songId, queueMap) ->
+                            if (state == "LOADING" && songId.isNotEmpty()) {
+                                val song = queueMap[songId]
+                                if (song != null) {
+                                    // Delegate to KaraokeController
+                                    karaokeController.loadSongResources(song, roomId, currentUser.id)
+                                }
+                            }
+                        }
+                    }
+                    
                     ActivePartyRoom(
                         roomId = roomId,
                         users = users,
@@ -133,6 +156,8 @@ fun PartyScreen(
                         searchResults = searchResults, // Pass results
                         playbackState = playbackState, // NEW
                         startTime = startTime, // NEW
+                        partyViewModel = viewModel, // Core party logic
+                        karaokeController = karaokeController, // Karaoke-specific logic
                         onSearchQueryChange = { viewModel.setSearchQuery(it) },
                         onRemoveSong = { viewModel.removeSong(it) },
                         onAddSong = { viewModel.addSongToQueue(it) }, // Pass Add action
