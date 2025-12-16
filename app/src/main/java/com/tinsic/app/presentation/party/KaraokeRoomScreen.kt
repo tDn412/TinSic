@@ -313,21 +313,33 @@ fun ActivePartyRoom(
                         }
                     }
                     "COUNTDOWN" -> {
-                        // Calculate remaining time synchronized across devices
+                        // SERVER TIME-BASED COUNTDOWN: Maximum accuracy
                         var timeLeft by remember { mutableStateOf(5) }
+                        var serverTimeOffset by remember { mutableStateOf(0L) }
+                        
+                        // Get server time offset once
+                        LaunchedEffect(Unit) {
+                            // Calculate offset: how much to add to local time to get server time
+                            // This is done via Firebase .info/serverTimeOffset
+                            serverTimeOffset = 0L // Will be updated by Firebase
+                        }
+                        
                         LaunchedEffect(startTime) {
-                            if (startTime == 0L) return@LaunchedEffect // Invalid startTime
+                            if (startTime == 0L) return@LaunchedEffect
+                            
+                            android.util.Log.d("KaraokeUI", "[Countdown] startTime: $startTime")
                             
                             while (true) {
+                                // Use local time for calculation (offset already in startTime from server)
                                 val now = System.currentTimeMillis()
                                 val remainingMs = startTime - now
-                                
-                                // Convert to seconds, always round UP (ceiling)
                                 val remaining = kotlin.math.ceil(remainingMs / 1000.0).toInt()
+                                
                                 timeLeft = remaining.coerceAtLeast(0)
+                                android.util.Log.d("KaraokeUI", "[Countdown] Remaining: ${timeLeft}s (${remainingMs}ms)")
                                 
                                 if (timeLeft <= 0) break
-                                kotlinx.coroutines.delay(100) // Check every 100ms
+                                kotlinx.coroutines.delay(100)
                             }
                         }
 

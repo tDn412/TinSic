@@ -133,37 +133,38 @@ class PartyViewModel @Inject constructor(
 
                 if (readyCount >= requiredCount && requiredCount > 0) {
                     Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
-                    val countdownStart = System.currentTimeMillis() + 5000 // 5 seconds from now
+                    // Use Firebase Server Time for perfect sync across all devices
+                    val countdownStart = partyRepository.getServerTime() + 5000
+                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart (server time)")
                     partyRepository.updatePlaybackState(roomIdValue, "COUNTDOWN", countdownStart)
                 }
             }.collect { }
         }
 
-        // Countdown: Auto-transition to PLAYING when countdown ends
+        // Countdown: Auto-transition to PLAYING when server countdown ends
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
                 playbackState,
                 startTime,
                 currentUser,
-                connectedUsers,
-                roomId
-            ) { state, start, user, members, roomIdValue ->
+                hostId
+            ) { state, start, user, currentHostId ->
                 if (state != "COUNTDOWN") return@combine
                 if (start == 0L) return@combine
-
-                val now = System.currentTimeMillis()
-                val timeLeft = start - now
-
-                if (timeLeft <= 0) {
-                    // Countdown finished
-                    val hostId = members.firstOrNull()?.id ?: ""
-                    if (user.id == hostId) {
-                        Log.d("PartyVM", "[Countdown] Finished! Starting playback...")
-                        partyRepository.updatePlaybackState(roomIdValue, "PLAYING", 0L)
+                
+                // Only host triggers the transition
+                if (user.id == currentHostId) {
+                    val serverNow = partyRepository.getServerTime()
+                    val timeLeft = start - serverNow
+                    
+                    Log.d("PartyVM", "[Countdown] Time left: ${timeLeft}ms (server time)")
+                    
+                    if (timeLeft <= 0) {
+                        Log.d("PartyVM", "[Countdown] Finished! Transitioning to PLAYING...")
+                        partyRepository.updatePlaybackState(_roomId.value, "PLAYING", 0L)
+                    } else {
+                        kotlinx.coroutines.delay(timeLeft.coerceAtMost(5000) + 100)
                     }
-                } else {
-                    // Still counting down, wait and check again
-                    kotlinx.coroutines.delay(timeLeft + 100)
                 }
             }.collect { }
         }
@@ -172,6 +173,9 @@ class PartyViewModel @Inject constructor(
     private fun generateRoomId(): String {
         return Random.nextInt(1000, 9999).toString()
     }
+    
+    // Expose server time to UI
+    fun getServerTime(): Long = partyRepository.getServerTime()
 
     // --- REALTIME LOGIC ---
     

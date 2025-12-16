@@ -17,6 +17,32 @@ import javax.inject.Singleton
 class PartyRepository @Inject constructor(
     private val realtimeDb: FirebaseDatabase
 ) {
+    
+    // Server time offset for accurate synchronization
+    private var serverTimeOffset: Long = 0L
+    
+    init {
+        // Calculate server time offset on initialization
+        estimateServerTimeOffset()
+    }
+    
+    private fun estimateServerTimeOffset() {
+        val offsetRef = realtimeDb.getReference(".info/serverTimeOffset")
+        offsetRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                serverTimeOffset = snapshot.getValue(Long::class.java) ?: 0L
+                android.util.Log.d("PartyRepo", "Server time offset: ${serverTimeOffset}ms")
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("PartyRepo", "Failed to get server offset: ${error.message}")
+            }
+        })
+    }
+    
+    // Get current server time (adjusted local time)
+    fun getServerTime(): Long {
+        return System.currentTimeMillis() + serverTimeOffset
+    }
 
     fun getPartyRoom(roomId: String): Flow<PartyRoom?> = callbackFlow {
         val reference = realtimeDb.getReference("parties").child(roomId)
