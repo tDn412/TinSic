@@ -52,23 +52,27 @@ class GameViewModel @javax.inject.Inject constructor(
     
     /**
      * Inject real players from PartyViewModel
-     * Call this BEFORE selectGame()
+     * Called initially and when Firebase updates player data
      */
     fun setPlayers(players: List<com.tinsic.app.presentation.party.PartyUser>, currentUserId: String) {
         currentPlayerId = currentUserId
-        currentRoomId = "" // Will be set separately
         
-        // Convert PartyUser to PlayerScore
-        val playerScores = players.map { p ->
+        // Merge: Use scores from Firebase, but preserve local game state
+        val updatedScores = players.map { firebasePlayer ->
+            // Check if this player already exists in local state
+            val existingPlayer = _uiState.value.playerScores.find { it.playerId == firebasePlayer.id }
+            
             PlayerScore(
-                playerId = p.id,
-                name = p.name,
-                score = p.score,
-                answeredCorrectly = false
+                playerId = firebasePlayer.id,
+                playerName = firebasePlayer.name,
+                score = firebasePlayer.score,  // Always use Firebase score (source of truth)
+                answeredCorrectly = existingPlayer?.answeredCorrectly ?: false,  // Preserve local state
+                isCurrentPlayer = firebasePlayer.id == currentUserId
             )
-        }
-        _uiState.value = _uiState.value.copy(playerScores = playerScores)
-        android.util.Log.d("GameViewModel", "Players set: ${players.size}, currentUser: $currentUserId")
+        }.sortedByDescending { it.score }
+        
+        _uiState.value = _uiState.value.copy(playerScores = updatedScores)
+        android.util.Log.d("GameViewModel", "Updated players from Firebase: ${players.size} players, current scores: ${updatedScores.map { "${it.playerName}:${it.score}" }}")
     }
     
     /**
