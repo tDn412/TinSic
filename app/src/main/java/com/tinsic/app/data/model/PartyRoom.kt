@@ -1,5 +1,6 @@
 package com.tinsic.app.data.model
 
+@com.google.firebase.database.IgnoreExtraProperties
 data class PartyStatus(
     val playbackState: String = "IDLE", // IDLE, LOADING, COUNTDOWN, PLAYING, ENDED
     val startTime: Long = 0L,           // Timestamp for countdown start
@@ -13,7 +14,9 @@ data class PartyRoom(
     val hostId: String = "",
     val type: String = "KARAOKE", // KARAOKE or GAME
     val currentSongId: String = "",
-    val isPlaying: Boolean = false,
+    @get:com.google.firebase.database.PropertyName("playing")
+    @set:com.google.firebase.database.PropertyName("playing")
+    var isPlaying: Boolean = false,
     val timestamp: Long = 0L,
     val members: Map<String, UserMember> = emptyMap(),
     val stage: Map<String, UserMember> = emptyMap(), // Users currently on stage
@@ -30,9 +33,12 @@ data class UserMember(
     val avatar: String = "👤",
     val score: Int = 0,
     val color: Long = 0xFF000000, // ARGB Long
+    @get:com.google.firebase.database.PropertyName("playing")
+    @set:com.google.firebase.database.PropertyName("playing")
+    var isPlaying: Boolean = false,
     val joinedAt: Long = 0L
 ) {
-    constructor() : this("", "", "👤", 0, 0xFF000000, 0L)
+    constructor() : this("", "", "👤", 0, 0xFF000000, false, 0L)
 }
 
 data class QueueSong(

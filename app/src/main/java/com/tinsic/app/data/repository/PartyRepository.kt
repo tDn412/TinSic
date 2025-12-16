@@ -260,8 +260,8 @@ class PartyRepository @Inject constructor(
             Result.failure(e)
         }
     }
-
-    // --- QUEUE FUNCTIONS ---
+    
+    // --- QUEUE FUNCTIONS (Karaoke) ---
 
     suspend fun addSongToQueue(roomId: String, song: com.tinsic.app.data.model.QueueSong): Result<Unit> {
         return try {
@@ -286,7 +286,138 @@ class PartyRepository @Inject constructor(
         }
     }
     
-    // --- SCORE FUNCTIONS ---
+    // --- GAME ROOM FUNCTIONS ---
+    
+    /**
+     * Update player score in Firebase Realtime Database
+     * Called by GameViewModel when player answers questions
+     */
+    suspend fun updatePlayerScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("members").child(userId)
+                .child("score").setValue(newScore).await()
+            android.util.Log.d("PartyRepo", "Updated score for $userId: $newScore")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    
+    /**
+     * Update playing status for a specific player
+     * Used to show which player is currently active in the game
+     */
+    suspend fun updatePlayerPlayingStatus(roomId: String, userId: String, isPlaying: Boolean): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("members").child(userId)
+                .child("playing").setValue(isPlaying).await()
+            android.util.Log.d("PartyRepo", "Updated playing status for $userId: $isPlaying")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update playing status: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    // --- GAME SESSION SYNC ---
+    
+    /**
+     * Listen to game session updates in real-time
+     * Called by ALL players to stay in sync
+     */
+    fun observeGameSession(roomId: String): Flow<com.tinsic.app.data.model.GameSession?> = callbackFlow {
+        val reference = realtimeDb.getReference("parties").child(roomId).child("gameSession")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val session = snapshot.getValue(com.tinsic.app.data.model.GameSession::class.java)
+                android.util.Log.d("PartyRep_RAW", "Data: ${snapshot.key} => ${snapshot.value}") // Raw Data Log
+                trySend(session)
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("PartyRep_RAW", "Cancelled: ${error.message}")
+                trySend(null)
+            }
+        }
+        reference.addValueEventListener(listener)
+        awaitClose { reference.removeEventListener(listener) }
+    }
+    
+    /**
+     * Start a new game session (HOST ONLY)
+     * Creates initial game state with shuffled questions
+     */
+    suspend fun startGameSession(
+        roomId: String,
+        hostId: String,
+        gameType: String,
+        questionIds: List<String>
+    ): Result<Unit> {
+        return try {
+            val session = com.tinsic.app.data.model.GameSession(
+                gameType = gameType,
+                isActive = true,
+                hostId = hostId,
+                currentQuestionIndex = 0,
+                timeLeft = 5,  // Countdown
+                phase = "COUNTDOWN",
+                questionIds = questionIds,  // Use order provided by ViewModel (sorted by ID)
+                startedAt = System.currentTimeMillis(),
+                countdownStartedAt = System.currentTimeMillis(),
+                questionStartedAt = 0
+            )
+            
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").setValue(session).await()
+            
+            android.util.Log.d("PartyRepo", "Started game session: $gameType")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to start game session: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Update game session phase (HOST ONLY)
+     */
+    suspend fun updateGamePhase(roomId: String, phase: String, additionalUpdates: Map<String, Any> = emptyMap()): Result<Unit> {
+        return try {
+            val updates = mutableMapOf<String, Any>("phase" to phase)
+            updates.putAll(additionalUpdates)
+            
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").updateChildren(updates).await()
+            
+            android.util.Log.d("PartyRepo", "Updated game phase: $phase")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update game phase: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * End game session (HOST ONLY)
+     */
+    suspend fun endGameSession(roomId: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("gameSession").removeValue().await()
+            
+            android.util.Log.d("PartyRepo", "Ended game session")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to end game session: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    // --- SCORE FUNCTIONS (Karaoke) ---
     
     /**
      * Update member's score in Firebase
