@@ -102,20 +102,14 @@ fun PartyScreen(
             PartyModeState.ROOM -> {
                 // SWITCH UI BASED ON ROOM TYPE
                 if (roomType == "GAME") {
-                    // Placeholder for Game Team
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("🎮 Game Room", color = Color.Green, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                            Text("ID: $roomId", color = Color.White)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(onClick = { viewModel.leaveRoom() }) {
-                                Text("Leave Game")
-                            }
+                    // Game Room Screen
+                    GameRoomScreen(
+                        partyViewModel = viewModel,
+                        onLeaveRoom = {
+                            viewModel.leaveRoom()
+                            onLeaveSession()
                         }
-                    }
+                    )
                 } else {
                     ActivePartyRoom(
                         roomId = roomId,
@@ -326,13 +320,16 @@ fun LobbyScreen(
                         }
                     )
                     
-                    // GAME OPTION (Disabled)
+                    // GAME OPTION
                     PartyTypeOption(
                         title = "🎮 Game Room",
-                        description = "Play mini-games (Coming Soon)",
-                        color = Color.Gray,
-                        isEnabled = false,
-                        onClick = {}
+                        description = "Play mini-games together",
+                        color = Color(0xFF10B981), // Green
+                        isEnabled = true,  // ENABLED for Game Team
+                        onClick = {
+                            showTypeDialog = false
+                            onStartParty("GAME")
+                        }
                     )
                 }
             },
