@@ -20,12 +20,9 @@ import javax.inject.Inject
 @HiltViewModel
 class PartyViewModel @Inject constructor(
     private val partyRepository: PartyRepository,
-<<<<<<< HEAD
     private val auth: com.google.firebase.auth.FirebaseAuth,
-    private val userRepository: com.tinsic.app.data.repository.UserRepository
-=======
+    private val userRepository: com.tinsic.app.data.repository.UserRepository,
     private val karaokeLibraryRepository: com.tinsic.app.data.repository.KaraokeLibraryRepository
->>>>>>> origin/main
 ) : ViewModel() {
 
     // --- STATES ---

@@ -260,26 +260,8 @@ class PartyRepository @Inject constructor(
             Result.failure(e)
         }
     }
-<<<<<<< HEAD
     
-    // --- GAME ROOM FUNCTIONS ---
-    
-    /**
-     * Update player score in Firebase Realtime Database
-     * Called by GameViewModel when player answers questions
-     */
-    suspend fun updatePlayerScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
-        return try {
-            realtimeDb.getReference("parties").child(roomId)
-                .child("members").child(userId)
-                .child("score").setValue(newScore).await()
-            android.util.Log.d("PartyRepo", "Updated score for $userId: $newScore")
-            Result.success(Unit)
-        } catch (e: Exception) {
-            android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}")
-=======
-
-    // --- QUEUE FUNCTIONS ---
+    // --- QUEUE FUNCTIONS (Karaoke) ---
 
     suspend fun addSongToQueue(roomId: String, song: com.tinsic.app.data.model.QueueSong): Result<Unit> {
         return try {
@@ -300,12 +282,29 @@ class PartyRepository @Inject constructor(
                 .child("queue").child(songKey).removeValue().await()
             Result.success(Unit)
         } catch (e: Exception) {
->>>>>>> origin/main
             Result.failure(e)
         }
     }
     
-<<<<<<< HEAD
+    // --- GAME ROOM FUNCTIONS ---
+    
+    /**
+     * Update player score in Firebase Realtime Database
+     * Called by GameViewModel when player answers questions
+     */
+    suspend fun updatePlayerScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("members").child(userId)
+                .child("score").setValue(newScore).await()
+            android.util.Log.d("PartyRepo", "Updated score for $userId: $newScore")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
     /**
      * Update playing status for a specific player
      * Used to show which player is currently active in the game
@@ -413,8 +412,11 @@ class PartyRepository @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("PartyRepo", "Failed to end game session: ${e.message}")
-=======
-    // --- SCORE FUNCTIONS ---
+            Result.failure(e)
+        }
+    }
+    
+    // --- SCORE FUNCTIONS (Karaoke) ---
     
     /**
      * Update member's score in Firebase
@@ -437,7 +439,6 @@ class PartyRepository @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}", e)
->>>>>>> origin/main
             Result.failure(e)
         }
     }
