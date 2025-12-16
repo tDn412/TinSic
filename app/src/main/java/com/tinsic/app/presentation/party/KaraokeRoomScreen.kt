@@ -313,15 +313,21 @@ fun ActivePartyRoom(
                         }
                     }
                     "COUNTDOWN" -> {
-                        // Calculate remaining time
-                        var timeLeft by remember { mutableStateOf(0) }
+                        // Calculate remaining time synchronized across devices
+                        var timeLeft by remember { mutableStateOf(5) }
                         LaunchedEffect(startTime) {
+                            if (startTime == 0L) return@LaunchedEffect // Invalid startTime
+                            
                             while (true) {
                                 val now = System.currentTimeMillis()
-                                val remaining = ((startTime - now) / 1000).toInt() + 1
+                                val remainingMs = startTime - now
+                                
+                                // Convert to seconds, always round UP (ceiling)
+                                val remaining = kotlin.math.ceil(remainingMs / 1000.0).toInt()
                                 timeLeft = remaining.coerceAtLeast(0)
+                                
                                 if (timeLeft <= 0) break
-                                kotlinx.coroutines.delay(100)
+                                kotlinx.coroutines.delay(100) // Check every 100ms
                             }
                         }
 
