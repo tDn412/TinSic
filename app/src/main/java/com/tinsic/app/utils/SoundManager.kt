@@ -8,12 +8,6 @@ import com.tinsic.app.R
 /**
  * Sound manager for game sound effects
  * Uses SoundPool for low-latency playback of correct/wrong answer sounds
- * 
- * Usage:
- * 1. Call initialize(context) when app starts (e.g., in MainActivity.onCreate)
- * 2. Add correct.mp3 and wrong.mp3 to res/raw folder
- * 3. Call playCorrectSound() or playWrongSound() when needed
- * 4. Call release() when app is destroyed (e.g., in MainActivity.onDestroy)
  */
 object SoundManager {
     private var soundPool: SoundPool? = null
@@ -40,9 +34,10 @@ object SoundManager {
                 .setAudioAttributes(audioAttributes)
                 .build()
             
-            // Load sound files from res/raw
-            correctSoundId = soundPool?.load(context, R.raw.correct, 1) ?: 0
-            wrongSoundId = soundPool?.load(context, R.raw.wrong, 1) ?: 0
+            // Temporarily disabled - no sound files yet
+            // App will work silently until sound files are added
+            correctSoundId = 0
+            wrongSoundId = 0
             
             isInitialized = true
         } catch (e: Exception) {
@@ -51,50 +46,25 @@ object SoundManager {
     }
     
     /**
-     * Play correct answer sound
-     * Make sure to call initialize() first
+     * Play correct answer sound (currently disabled)
      */
     fun playCorrectSound() {
-        if (!isInitialized || soundPool == null) return
-        
-        try {
-            soundPool?.play(
-                correctSoundId,
-                0.5f,  // Left volume (50%)
-                0.5f,  // Right volume (50%)
-                1,     // Priority
-                0,     // Loop (0 = no loop)
-                1.0f   // Playback rate (1.0 = normal speed)
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Disabled - add correct.mp3 to res/raw to enable
+        // if (!isInitialized || soundPool == null || correctSoundId == 0) return
+        // soundPool?.play(correctSoundId, 0.5f, 0.5f, 1, 0, 1.0f)
     }
     
     /**
-     * Play wrong answer sound
-     * Make sure to call initialize() first
+     * Play wrong answer sound (currently disabled)
      */
     fun playWrongSound() {
-        if (!isInitialized || soundPool == null) return
-        
-        try {
-            soundPool?.play(
-                wrongSoundId,
-                0.5f,  // Left volume (50%)
-                0.5f,  // Right volume (50%)
-                1,     // Priority
-                0,     // Loop (0 = no loop)
-                1.0f   // Playback rate (1.0 = normal speed)
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Disabled - add wrong.mp3 to res/raw to enable
+        // if (!isInitialized || soundPool == null || wrongSoundId == 0) return
+        // soundPool?.play(wrongSoundId, 0.5f, 0.5f, 1, 0, 1.0f)
     }
     
     /**
      * Release SoundPool resources
-     * Call this in MainActivity.onDestroy()
      */
     fun release() {
         soundPool?.release()

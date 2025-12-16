@@ -84,10 +84,12 @@ fun PlayScreen(
         // Cấu hình RenderersFactory để tối ưu hóa audio rendering
         val renderersFactory = DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
         
         ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .setRenderersFactory(renderersFactory)
+            .setWakeMode(C.WAKE_MODE_LOCAL)  // Keep CPU awake for smooth playback
             .build()
             .apply {
                 // Cấu hình AudioAttributes cho chất lượng cao
@@ -100,8 +102,11 @@ fun PlayScreen(
                 // Tắt skip silence để tránh hiện tượng rè
                 skipSilenceEnabled = false
                 
-                // Set volume ổn định
-                volume = 1.0f
+                // Tắt audio offload để tránh glitches (distortion)
+                experimentalSetOffloadSchedulingEnabled(false)
+                
+                // Set volume ổn định ở mức vừa phải
+                volume = 0.8f  // Giảm từ 1.0 xuống 0.8 để tránh clipping
                 
                 addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
