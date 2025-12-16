@@ -142,13 +142,23 @@ class GameViewModel @javax.inject.Inject constructor(
                     }
                 }
                 
+                // Check if question changed (HOST moved to next question)
+                val questionChanged = _uiState.value.currentQuestionIndex != session.currentQuestionIndex
+                
                 // Sync current question and timer
                 _uiState.value = _uiState.value.copy(
                     currentScreen = GameScreenState.PLAYING,
                     currentQuestionIndex = session.currentQuestionIndex,
-                    timeLeft = session.timeLeft
+                    timeLeft = session.timeLeft,
+                    // Reset answer state when question changes
+                    selectedAnswerIndex = if (questionChanged) null else _uiState.value.selectedAnswerIndex,
+                    isAnswerRevealed = if (questionChanged) false else _uiState.value.isAnswerRevealed,
+                    isAnswerLocked = if (questionChanged) false else _uiState.value.isAnswerLocked
                 )
-                android.util.Log.d("GameViewModel", "CLIENT: Synced to PLAYING phase, question ${session.currentQuestionIndex}")
+                
+                if (questionChanged) {
+                    android.util.Log.d("GameViewModel", "CLIENT: Moved to question ${session.currentQuestionIndex}")
+                }
             }
             "ANSWER_REVEAL" -> {
                 // Host revealed answer
@@ -516,6 +526,23 @@ class GameViewModel @javax.inject.Inject constructor(
                     isAnswerLocked = false,
                     isMusicPreviewPhase = true  // Set music preview phase
                 )
+                
+                // HOST: Update Firebase with next question
+                if (isHost && currentRoomId.isNotEmpty()) {
+                    viewModelScope.launch {
+                        partyRepository.updateGamePhase(
+                            roomId = currentRoomId,
+                            phase = "PLAYING",
+                            additionalUpdates = mapOf(
+                                "currentQuestionIndex" to nextIndex,
+                                "timeLeft" to 10,
+                                "questionStartedAt" to System.currentTimeMillis()
+                            )
+                        )
+                        android.util.Log.d("GameViewModel", "HOST: Advanced to question $nextIndex")
+                    }
+                }
+                
                 startMusicPreviewThenTimer()
             } else {
                 // For LYRICS_FLIP, FINISH_THE_LYRICS, and MUSIC_CODE, go straight to playing
@@ -528,12 +555,39 @@ class GameViewModel @javax.inject.Inject constructor(
                     isAnswerLocked = false,
                     isMusicPreviewPhase = false
                 )
+                
+                // HOST: Update Firebase with next question
+                if (isHost && currentRoomId.isNotEmpty()) {
+                    viewModelScope.launch {
+                        partyRepository.updateGamePhase(
+                            roomId = currentRoomId,
+                            phase = "PLAYING",
+                            additionalUpdates = mapOf(
+                                "currentQuestionIndex" to nextIndex,
+                                "timeLeft" to 10,
+                                "questionStartedAt" to System.currentTimeMillis()
+                            )
+                        )
+                        android.util.Log.d("GameViewModel", "HOST: Advanced to question $nextIndex")
+                    }
+                }
+                
                 startTimer()
             }
         } else {
-            _uiState.value = _uiState.value.copy(currentScreen = GameScreenState.RESULT)
+            // Game Over
+            _uiState.value = _uiState.value.copy(
+                currentScreen = GameScreenState.MENU,
+                isGameOver = true
+            )
+            
+            // HOST: End game session in Firebase
+            if (isHost && currentRoomId.isNotEmpty()) {
+                viewModelScope.launch {
+                    partyRepository.endGameSession(currentRoomId)
+                    android.util.Log.d("GameViewModel", "HOST: Game ended, session cleaned up")
+                }
+            }
         }
     }
 }
-
-
