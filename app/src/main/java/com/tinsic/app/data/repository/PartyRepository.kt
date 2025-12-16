@@ -117,6 +117,31 @@ class PartyRepository @Inject constructor(
         }
     }
 
+    // New: Update playback state machine (for sync engine)
+    suspend fun updatePlaybackState(roomId: String, state: String, startTime: Long = 0L): Result<Unit> {
+        return try {
+            val updates = mapOf(
+                "status/playbackState" to state,
+                "status/startTime" to startTime
+            )
+            realtimeDb.getReference("parties").child(roomId).updateChildren(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // New: Set member ready state (resource loaded)
+    suspend fun setMemberReady(roomId: String, userId: String, isReady: Boolean): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("status/readyState").child(userId).setValue(isReady).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun leavePartyRoom(roomId: String, userId: String): Result<Unit> = try {
         val roomRef = realtimeDb.getReference("parties").child(roomId)
         
@@ -192,6 +217,31 @@ class PartyRepository @Inject constructor(
         return try {
             realtimeDb.getReference("parties").child(roomId)
                 .child("stage").child(userId).removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // --- QUEUE FUNCTIONS ---
+
+    suspend fun addSongToQueue(roomId: String, song: com.tinsic.app.data.model.QueueSong): Result<Unit> {
+        return try {
+            // Use push() to generate unique ID for queue item (preserves order)
+            val queueRef = realtimeDb.getReference("parties").child(roomId).child("queue").push()
+            // Store the ID inside the object too for easier deletion
+            val songWithId = song.copy(id = queueRef.key ?: "")
+            queueRef.setValue(songWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeSongFromQueue(roomId: String, songKey: String): Result<Unit> {
+        return try {
+            realtimeDb.getReference("parties").child(roomId)
+                .child("queue").child(songKey).removeValue().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

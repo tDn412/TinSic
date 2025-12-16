@@ -19,7 +19,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PartyViewModel @Inject constructor(
-    private val partyRepository: PartyRepository
+    private val partyRepository: PartyRepository,
+    private val karaokeLibraryRepository: com.tinsic.app.data.repository.KaraokeLibraryRepository
 ) : ViewModel() {
 
     // --- STATES ---
@@ -51,6 +52,10 @@ class PartyViewModel @Inject constructor(
     private val _queue = MutableStateFlow<List<PartySong>>(emptyList())
     val queue: StateFlow<List<PartySong>> = _queue.asStateFlow()
 
+    // Search Results from Firestore (Karaoke Assets)
+    private val _searchResults = MutableStateFlow<List<com.tinsic.app.data.model.KaraokeSong>>(emptyList())
+    val searchResults: StateFlow<List<com.tinsic.app.data.model.KaraokeSong>> = _searchResults.asStateFlow()
+
     private val _roomId = MutableStateFlow("")
     val roomId: StateFlow<String> = _roomId.asStateFlow()
 
@@ -61,9 +66,92 @@ class PartyViewModel @Inject constructor(
     private val _roomType = MutableStateFlow("KARAOKE")
     val roomType: StateFlow<String> = _roomType.asStateFlow()
 
+    // --- SYNC ENGINE STATES ---
+    private val _playbackState = MutableStateFlow("IDLE")
+    val playbackState: StateFlow<String> = _playbackState.asStateFlow()
+
+    private val _startTime = MutableStateFlow(0L)
+    val startTime: StateFlow<Long> = _startTime.asStateFlow()
+
+    private val _readyState = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val readyState: StateFlow<Map<String, Boolean>> = _readyState.asStateFlow()
+
     init {
         // Generate a random Room ID immediately when entering Lobby
         _roomId.value = generateRoomId()
+        
+        // --- SYNC ENGINE LOGIC ---
+        
+        // SimulateDownload: When state changes to LOADING, auto-load resources
+        viewModelScope.launch {
+            playbackState.collect { state ->
+                if (state == "LOADING") {
+                    Log.d("PartyVM", "[SimulateDownload] State=LOADING, starting resource load...")
+                    kotlinx.coroutines.delay(3000) // Simulate MP3/JSON download
+                    Log.d("PartyVM", "[SimulateDownload] Resource loaded! Setting ready...")
+                    partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, true)
+                }
+            }
+        }
+
+        // HostControl: Monitor ready state and trigger countdown
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                readyState,
+                stageUsers,
+                connectedUsers,
+                currentUser,
+                roomId
+            ) { ready, stage, members, user, roomIdValue ->
+                // Only run if I'm the host
+                val room = members.find { it.id == user.id } ?: return@combine
+                val hostId = members.firstOrNull()?.id ?: "" // Simplified: assume first member is host
+                
+                if (user.id != hostId) return@combine // Not host, skip
+                if (_playbackState.value != "LOADING") return@combine // Not in loading state
+
+                // Calculate required ready count: stage members + host
+                val requiredCount = stage.size + 1 // Host + stage performers
+                val readyCount = ready.values.count { it }
+
+                Log.d("PartyVM", "[HostControl] Ready: $readyCount/$requiredCount")
+
+                if (readyCount >= requiredCount && requiredCount > 0) {
+                    Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
+                    val countdownStart = System.currentTimeMillis() + 5000 // 5 seconds from now
+                    partyRepository.updatePlaybackState(roomIdValue, "COUNTDOWN", countdownStart)
+                }
+            }.collect { }
+        }
+
+        // Countdown: Auto-transition to PLAYING when countdown ends
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                playbackState,
+                startTime,
+                currentUser,
+                connectedUsers,
+                roomId
+            ) { state, start, user, members, roomIdValue ->
+                if (state != "COUNTDOWN") return@combine
+                if (start == 0L) return@combine
+
+                val now = System.currentTimeMillis()
+                val timeLeft = start - now
+
+                if (timeLeft <= 0) {
+                    // Countdown finished
+                    val hostId = members.firstOrNull()?.id ?: ""
+                    if (user.id == hostId) {
+                        Log.d("PartyVM", "[Countdown] Finished! Starting playback...")
+                        partyRepository.updatePlaybackState(roomIdValue, "PLAYING", 0L)
+                    }
+                } else {
+                    // Still counting down, wait and check again
+                    kotlinx.coroutines.delay(timeLeft + 100)
+                }
+            }.collect { }
+        }
     }
 
     private fun generateRoomId(): String {
@@ -120,9 +208,28 @@ class PartyViewModel @Inject constructor(
                         )
                     }
                     _stageUsers.value = stageList
+
+                    // Update Queue (Map to List sorted by timestamp or natural order)
+                    // Note: Firebase push keys are time-ordered essentially.
+                    val queueList = room.queue.values.map { item ->
+                        PartySong(
+                            id = item.id.hashCode(), // Int ID for UI compatibility (temporary)
+                            title = item.title,
+                            artist = item.artist,
+                            coverUrl = item.coverUrl,
+                            duration = 0, // Not stored yet
+                            firebaseId = item.id // Store real ID
+                        )
+                    }.sortedBy { it.firebaseId } // Sort by ID (time)
+                    _queue.value = queueList
+
+                    // Update Sync Engine States
+                    _playbackState.value = room.status.playbackState
+                    _startTime.value = room.status.startTime
+                    _readyState.value = room.status.readyState
                     
                     // Log for debugging
-                    println("DEBUG: Room Update Received! Members: ${membersList.size}")
+                    // println("DEBUG: Room Update Received! Members: ${membersList.size}")
                 }
             }
         }
@@ -153,6 +260,19 @@ class PartyViewModel @Inject constructor(
                 
                 // Update current user so they have Crown avatar locally if needed
                 _currentUser.value = host.copy(avatar = "👑", color = Color(0xFFEC4899))
+                
+                // AUTO-ADD DEMO SONG: "Phía Sau Một Cô Gái" để test sync engine
+                val demoSong = com.tinsic.app.data.model.QueueSong(
+                    id = "",
+                    title = "Phía Sau Một Cô Gái",
+                    artist = "Soobin Hoàng Sơn",
+                    coverUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media", // Placeholder
+                    audioUrl = "https://firebasestorage.googleapis.com/v0/b/tinsic.firebasestorage.app/o/karaoke_assets%2FPhiaSauMotCoGai%2FBeat_PhiaSauMotCoGai.mp3?alt=media",
+                    addedByUserId = host.id,
+                    addedByUserName = host.name,
+                    timestamp = System.currentTimeMillis()
+                )
+                partyRepository.addSongToQueue(currentRoomId, demoSong)
             } else {
                 Log.e("PartyDebug", "FIREBASE ERROR: ${result.exceptionOrNull()}")
             }
@@ -184,12 +304,51 @@ class PartyViewModel @Inject constructor(
     }
 
     fun removeSong(songId: Int) {
-        // TODO: Implement Real remove song
-        println("DEBUG: Remove Song $songId requested (Not implemented yet)")
+        // Find the full PartySong object with Firebase ID
+        val song = _queue.value.find { it.id == songId }
+        val firebaseId = song?.firebaseId ?: return
+
+        viewModelScope.launch {
+            partyRepository.removeSongFromQueue(_roomId.value, firebaseId)
+        }
     }
 
+    private var searchJob: Job? = null
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+        searchJob?.cancel()
+        
+        if (query.isBlank()) {
+            _searchResults.value = emptyList()
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(500) // Debounce 500ms
+            val results = karaokeLibraryRepository.searchKaraokeSongs(query)
+            _searchResults.value = results
+        }
+    }
+
+    fun addSongToQueue(song: com.tinsic.app.data.model.KaraokeSong) {
+        val user = _currentUser.value
+        val queueItem = com.tinsic.app.data.model.QueueSong(
+            id = "", // Generated by repo
+            title = song.title,
+            artist = song.artist,
+            coverUrl = song.coverUrl,
+            audioUrl = song.audioUrl,
+            addedByUserId = user.id,
+            addedByUserName = user.name,
+            timestamp = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch {
+            partyRepository.addSongToQueue(_roomId.value, queueItem)
+            // Clear search after adding
+            _searchQuery.value = ""
+            _searchResults.value = emptyList()
+        }
     }
 
     fun leaveRoom() {
@@ -201,6 +360,8 @@ class PartyViewModel @Inject constructor(
         isDisconnecting = true
         _connectedUsers.value = emptyList()
         _stageUsers.value = emptyList()
+        _queue.value = emptyList()
+        _searchResults.value = emptyList()
         
         // 2. Stop listening
         roomJob?.cancel()
@@ -249,6 +410,18 @@ class PartyViewModel @Inject constructor(
                     partyRepository.joinStage(room, meMember)
                 }
             }
+        }
+    }
+
+    // Start the song (move from queue to current + trigger LOADING state)
+    fun startSong(songId: String) {
+        viewModelScope.launch {
+            // Clear all ready states
+            partyRepository.setMemberReady(_roomId.value, _currentUser.value.id, false)
+            // Transition to LOADING
+            partyRepository.updatePlaybackState(_roomId.value, "LOADING", 0L)
+            // Update current song
+            partyRepository.updateCurrentSong(_roomId.value, songId)
         }
     }
 }

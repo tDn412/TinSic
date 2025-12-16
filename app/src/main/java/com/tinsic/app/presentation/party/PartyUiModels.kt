@@ -14,7 +14,9 @@ data class PartySong(
     val id: Int,
     val title: String,
     val artist: String,
-    val albumArt: String
+    val coverUrl: String, // Renamed from albumArt
+    val duration: Int = 0,
+    val firebaseId: String = "" // Added for removal logic
 )
 
 enum class PartyModeState {
