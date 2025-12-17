@@ -118,7 +118,7 @@ class GameViewModel @javax.inject.Inject constructor(
                     handleGameSessionUpdate(session)
                 } else if (session == null || !session.isActive) {
                     // Session ended (host left or game over)
-                    if (!isHost && _uiState.value.currentScreen != GameScreenState.MENU) {
+                    if (!isHost && _uiState.value.currentScreen != GameScreenState.MENU && _uiState.value.currentScreen != GameScreenState.RESULT) {
                         android.util.Log.d("GameViewModel", "CLIENT: Session ended, returning to menu")
                         _uiState.value = _uiState.value.copy(
                             currentScreen = GameScreenState.MENU,
@@ -667,17 +667,17 @@ class GameViewModel @javax.inject.Inject constructor(
                 startTimer()
             }
         } else {
-            // Game Over
+            // Game Over -> Show Leaderboard
             _uiState.value = _uiState.value.copy(
-                currentScreen = GameScreenState.MENU,
+                currentScreen = GameScreenState.RESULT,
                 isGameOver = true
             )
             
-            // HOST: End game session in Firebase
+            // HOST: Sync phase GAME_OVER
             if (isHost && currentRoomId.isNotEmpty()) {
                 viewModelScope.launch {
-                    partyRepository.endGameSession(currentRoomId)
-                    android.util.Log.d("GameViewModel", "HOST: Game ended, session cleaned up")
+                    partyRepository.updateGamePhase(currentRoomId, "GAME_OVER")
+                    android.util.Log.d("GameViewModel", "HOST: Game finished, phase set to GAME_OVER")
                 }
             }
         }
