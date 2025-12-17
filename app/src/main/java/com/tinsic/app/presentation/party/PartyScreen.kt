@@ -127,6 +127,15 @@ fun PartyScreen(
                     val karaokeController: com.tinsic.app.presentation.party.karaoke.KaraokePartyController = 
                         androidx.hilt.navigation.compose.hiltViewModel()
                     
+                    // Prefetch songs in queue for instant loading (background download)
+                    val queueForPrefetch by viewModel.queueWithUrls.collectAsState()
+                    LaunchedEffect(queueForPrefetch) {
+                        queueForPrefetch.values.forEach { song ->
+                            // Trigger background prefetch for each song in queue
+                            karaokeController.prefetchSong(song)
+                        }
+                    }
+                    
                     // Wire resource loading logic
                     LaunchedEffect(Unit) {
                         kotlinx.coroutines.flow.combine(
@@ -139,7 +148,7 @@ fun PartyScreen(
                             if (state == "LOADING" && songId.isNotEmpty()) {
                                 val song = queueMap[songId]
                                 if (song != null) {
-                                    // Delegate to KaraokeController
+                                    // Delegate to KaraokeController (will use cache if available!)
                                     karaokeController.loadSongResources(song, roomId, currentUser.id)
                                 }
                             }
