@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TinSic</string>
+    <string name="login">Login</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="display_name">Display Name</string>
+    <string name="home">Home</string>
+    <string name="discover">Discover</string>
+    <string name="party">Party</string>
+    <string name="profile">Profile</string>
+    <string name="quick_picks">Quick Picks</string>
+    <string name="keep_listening">Keep Listening</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+</resources>
