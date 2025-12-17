@@ -1,11 +1,53 @@
+# Báo cáo Bài tập lớn - Môn INT3120 1
+## Đề tài: Xây dựng ứng dụng nghe nhạc & Karaoke thông minh TinSic
 
-  # LinkBeat Mobile App Prototype
+### Thông tin nhóm
+- **Nhóm:** 6
+- **Môn học:** Phát triển ứng dụng di động (INT3120 1)
+- **Giảng viên hướng dẫn:** ThS. [Điền tên GV]
 
-  This is a code bundle for LinkBeat Mobile App Prototype. The original project is available at https://www.figma.com/design/Xzz2gOvzBculzjGnQkGhCe/LinkBeat-Mobile-App-Prototype.
+---
 
-  ## Running the code
+### 1. Giới thiệu tổng quan
+TinSic là ứng dụng giải trí đa phương tiện trên nền tảng Android, kết hợp giữa trình phát nhạc trực tuyến, tính năng Karaoke chấm điểm thời gian thực và các Minigame âm nhạc tương tác. Dự án hướng tới trải nghiệm người dùng hiện đại, trẻ trung với giao diện Dark Mode (Gravity Theme).
 
-  Run `npm i` to install the dependencies.
+### 2. Các chức năng đã xây dựng hoàn thiện
+Nhóm đã hoàn thành các module sau:
 
-  Run `npm run dev` to start the development server.
-  
+#### a. Module Phát nhạc (Music Player)
+- **Core Player:** Sử dụng **ExoPlayer (Media3)** để xử lý luồng âm thanh chuẩn.
+- **Tính năng:** Phát/Tạm dừng, Chuyển bài, Thanh tiến độ (Seek bar).
+- **Background Service:** Hỗ trợ phát nhạc nền khi thoát ứng dụng.
+
+#### b. Module Karaoke thông minh (Tính năng nổi bật)
+- **Giao diện:** Hiển thị lời bài hát chạy chữ (Lyrics Scrolling) đồng bộ theo thời gian thực.
+- **Xử lý âm thanh:**
+    - **Pitch Visualizer:** Biểu đồ trực quan hóa cao độ giọng hát người dùng so với cao độ chuẩn của bài hát.
+    - **Scoring System:** Hệ thống chấm điểm tự động (Thang điểm C -> SSS) dựa trên độ chính xác của cao độ và nhịp điệu.
+    - **Recording:** Hỗ trợ thu âm giọng hát người dùng.
+
+#### c. Module Minigame (Music Quiz)
+Tích hợp 3 chế độ chơi tương tác để tăng tính giải trí:
+1.  **Guess The Song:** Nghe đoạn nhạc dạo (Music Preview) và đoán tên bài hát trong thời gian giới hạn.
+2.  **Finish The Lyrics:** Điền từ còn thiếu vào đoạn lời bài hát đang hiển thị.
+3.  **Emoji Challenge:** Đoán tên bài hát dựa trên các biểu tượng Emoji gợi ý.
+- **Cơ chế Game:** Tính điểm (Score), Chuỗi thắng (Streak), Đếm ngược thời gian (Timer).
+
+#### d. Giao diện & Trải nghiệm (UI/UX)
+- **Jetpack Compose:** 100% giao diện được viết bằng Toolkit khai báo mới nhất của Google.
+- **Hiệu ứng:** Sử dụng Brush Gradient, Animation cho các màn hình Play, Karaoke để tạo cảm giác "không gian" (Deep Space theme).
+
+### 3. Công nghệ lập trình
+- **Ngôn ngữ:** Kotlin.
+- **Kiến trúc:** MVVM (Model-View-ViewModel).
+- **UI Framework:** Jetpack Compose (Material Design 3).
+- **Media Engine:** Android Media3 (ExoPlayer).
+- **Dependency Injection:** Dagger Hilt.
+- **Xử lý bất đồng bộ:** Coroutines & Flow.
+
+### 4. Hướng dẫn cài đặt
+1. **Yêu cầu:** Android Studio bản mới nhất (Ladybug/Hedgehog), JDK 17.
+2. **Cài đặt:**
+   - Clone repo: `git clone https://github.com/tDn412/INT_3120_1_ProjectG6.git`
+   - Mở project và đợi Gradle Sync.
+   - Cấp quyền Micro (Record Audio) khi vào tính năng Karaoke.
