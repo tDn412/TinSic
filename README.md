@@ -12,7 +12,7 @@
 TinSic là ứng dụng giải trí đa phương tiện trên nền tảng Android, kết hợp giữa trình phát nhạc trực tuyến, tính năng Karaoke chấm điểm thời gian thực và các Minigame âm nhạc tương tác. Dự án hướng tới trải nghiệm người dùng hiện đại, trẻ trung với giao diện Dark Mode (Gravity Theme).
 
 ### 2. Các chức năng đã xây dựng hoàn thiện
-Dựa trên source code hiện tại, nhóm đã hoàn thành các module sau:
+Nhóm đã hoàn thành các module sau:
 
 #### a. Module Phát nhạc (Music Player)
 - **Core Player:** Sử dụng **ExoPlayer (Media3)** để xử lý luồng âm thanh chuẩn.
@@ -51,6 +51,3 @@ Tích hợp 3 chế độ chơi tương tác để tăng tính giải trí:
    - Clone repo: `git clone https://github.com/tDn412/INT_3120_1_ProjectG6.git`
    - Mở project và đợi Gradle Sync.
    - Cấp quyền Micro (Record Audio) khi vào tính năng Karaoke.
-
----
-*Báo cáo được tổng hợp dựa trên tiến độ thực tế của source code tính đến ngày 17/12/2025.*
