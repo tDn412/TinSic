@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.tinsic.app.data.model.Playlist
+import com.tinsic.app.data.repository.SongRepository
 import com.tinsic.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,13 +17,17 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val songRepository: SongRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
+    // Helper to get current UID safely
+    private val _uid: String?
+        get() = auth.currentUser?.uid
+
     val playlists: StateFlow<List<Playlist>> = flow {
-        val uid = auth.currentUser?.uid
+        val uid = _uid
         if (uid != null) {
-            // Combine User stream (for Liked Songs) and Playlist stream (for Custom Playlists)
             combine(
                 userRepository.getUserById(uid),
                 userRepository.getUserPlaylists(uid)
@@ -34,16 +39,37 @@ class ProfileViewModel @Inject constructor(
                     songIds = user?.likedSongs ?: emptyList(),
                     isDefault = true
                 )
-                
-                // Return Liked Songs + Custom Playlists
                 listOf(likedSongsPlaylist) + customPlaylists
             }.collect { emit(it) }
         } else {
             emit(emptyList())
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val listeningHistory: StateFlow<List<com.tinsic.app.data.model.HistoryItem>> = flow {
+         val uid = _uid
+         if (uid != null) {
+             userRepository.getHistoryFlow(uid).collect { emit(it) }
+         } else {
+             emit(emptyList())
+         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val musicDna: StateFlow<com.tinsic.app.data.model.profile.MusicDnaProfile> = flow {
+        val uid = _uid
+        if (uid != null) {
+            combine(
+                userRepository.getHistoryFlow(uid),
+                songRepository.getAllSongs()
+            ) { history, songs ->
+                com.tinsic.app.analytics.AnalyticsEngine.calculateDnaProfile(history, songs)
+            }.collect { emit(it) }
+        } else {
+            emit(com.tinsic.app.data.model.profile.MusicDnaProfile(emptyMap(), emptyList(), emptyList()))
+        }
     }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        com.tinsic.app.data.model.profile.MusicDnaProfile(emptyMap(), emptyList(), emptyList())
     )
 }

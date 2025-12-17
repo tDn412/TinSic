@@ -19,4 +19,23 @@
     <string name="previous">Previous</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat">Repeat</string>
+
+    <string name="achievement_pop_fan_1_title">Tân Binh Pop</string>
+    <string name="achievement_pop_fan_2_title">Fan Cứng Pop</string>
+    <string name="achievement_pop_fan_3_title">Bậc Thầy Pop</string>
+    <string name="achievement_rock_enthusiast_1_title">Rock On!</string>
+    <string name="achievement_listener_1_title">Người Nghe Chăm Chỉ</string>
+    <string name="achievement_listener_2_title">Audiophile</string>
+    <string name="achievement_explorer_vn_title">Du Ca Việt</string>
+    <string name="achievement_explorer_us_uk_title">Âu Mỹ Sành Điệu</string>
+
+    <!-- Achievements Descriptions -->
+    <string name="achievement_pop_fan_1_description">Nghe 10 bài hát thuộc thể loại Pop</string>
+    <string name="achievement_pop_fan_2_description">Nghe 50 bài hát thuộc thể loại Pop</string>
+    <string name="achievement_pop_fan_3_description">Nghe 200 bài hát thuộc thể loại Pop</string>
+    <string name="achievement_rock_enthusiast_1_description">Nghe 10 bài hát thuộc thể loại Rock</string>
+    <string name="achievement_listener_1_description">Nghe tổng cộng 100 bài hát</string>
+    <string name="achievement_listener_2_description">Nghe tổng cộng 500 bài hát</string>
+    <string name="achievement_explorer_vn_description">Nghe 20 bài hát từ Việt Nam</string>
+    <string name="achievement_explorer_us_uk_description">Nghe 20 bài hát từ US/UK</string>
 </resources>
