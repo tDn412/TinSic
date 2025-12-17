@@ -17,17 +17,23 @@
 ---
 
 ### 1. Giới thiệu tổng quan
-TinSic là ứng dụng giải trí đa phương tiện trên nền tảng Android, kết hợp giữa trình phát nhạc trực tuyến, tính năng Karaoke chấm điểm thời gian thực và các Minigame âm nhạc tương tác. Dự án hướng tới trải nghiệm người dùng hiện đại, trẻ trung với giao diện Dark Mode (Gravity Theme).
+TinSic là ứng dụng giải trí đa phương tiện trên nền tảng Android, kết hợp giữa trình phát nhạc trực tuyến, tính năng Karaoke chấm điểm thời gian thực và các Minigame âm nhạc tương tác. Dự án hướng tới trải nghiệm người dùng hiện đại, trẻ trung và trải nghiệm tiếp cận âm nhạc mới mẻ với giao diện Dark Mode (Gravity Theme).
 
 ### 2. Các chức năng đã xây dựng hoàn thiện
-Nhóm đã hoàn thành các module sau:
 
 #### a. Module Phát nhạc (Music Player)
 - **Core Player:** Sử dụng **ExoPlayer (Media3)** để xử lý luồng âm thanh chuẩn.
-- **Tính năng:** Phát/Tạm dừng, Chuyển bài, Thanh tiến độ (Seek bar), Hiện lyric theo thời gian thực, dịch lyric.
+- **Tính năng:** Phát/Tạm dừng, Chuyển bài, Thanh tiến độ (Seek bar), Query bài hát, Shuffle, Repeat (1 bài/cả query), Lyric đồng bộ theo nhạc, Tự detect và dịch ngôn ngữ để có dual subtitle.
 - **Background Service:** Hỗ trợ phát nhạc nền khi thoát ứng dụng.
 
-#### b. Module Karaoke thông minh (Tính năng nổi bật)
+#### b. Module Khám phá & Cá nhân hóa (Personalization)
+- **Discover Mode (Tinder-style):** Giao diện vuốt (Swipe) trái/phải để thích hoặc bỏ qua bài hát, giúp gợi ý nhạc mới dựa trên sở thích (tương tự cơ chế của Tinder).
+- **Thư viện cá nhân (Library):**
+    - **History:** Lưu lại lịch sử nghe nhạc của người dùng, hiển thị theo Today, Yesterday và Month, có giờ nghe chi tiết.
+    - **Liked Songs:** Danh sách bài hát yêu thích.
+    - **Playlist:** Tạo và quản lý danh sách phát cá nhân.
+
+#### c. Module Karaoke thông minh (Tính năng nổi bật)
 - **Giao diện:** Hiển thị lời bài hát chạy chữ (Lyrics Scrolling) đồng bộ theo thời gian thực.
 - **Xử lý âm thanh:**
     - **Pitch Visualizer:** Biểu đồ trực quan hóa cao độ giọng hát người dùng so với cao độ chuẩn của bài hát.
@@ -41,11 +47,7 @@ Tích hợp 3 chế độ chơi tương tác để tăng tính giải trí:
 3.  **Emoji Challenge:** Đoán tên bài hát dựa trên các biểu tượng Emoji gợi ý.
 - **Cơ chế Game:** Tính điểm (Score), Chuỗi thắng (Streak), Đếm ngược thời gian (Timer).
 
-#### d. Giao diện & Trải nghiệm (UI/UX)
-- **Jetpack Compose:** 100% giao diện được viết bằng Toolkit khai báo mới nhất của Google.
-- **Hiệu ứng:** Sử dụng Brush Gradient, Animation cho các màn hình Play, Karaoke để tạo cảm giác "không gian" (Deep Space theme).
-
-### 3. Công nghệ lập trình
+### 3. Công nghệ nhóm đã sử dụng
 - **Ngôn ngữ:** Kotlin.
 - **Kiến trúc:** MVVM (Model-View-ViewModel).
 - **UI Framework:** Jetpack Compose (Material Design 3).
@@ -53,7 +55,7 @@ Tích hợp 3 chế độ chơi tương tác để tăng tính giải trí:
 - **Dependency Injection:** Dagger Hilt.
 - **Xử lý bất đồng bộ:** Coroutines & Flow.
 
-### 4. Hướng dẫn cài đặt
+### 4. Cài đặt
 1. **Yêu cầu:** Android Studio bản mới nhất (Ladybug/Hedgehog), JDK 17.
 2. **Cài đặt:**
    - Clone repo: `git clone https://github.com/tDn412/INT_3120_1_ProjectG6.git`
