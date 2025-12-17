@@ -37,11 +37,13 @@ import javax.inject.Inject
 data class CachedSongData(
     val notes: List<SongNote>,
     val lyrics: List<LyricLine>,
+    val mp3FilePath: String? = null,  // Host-only: Path to downloaded MP3
     val timestamp: Long = System.currentTimeMillis()
 )
 
 @HiltViewModel
 class KaraokePartyController @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val partyRepository: PartyRepository
 ) : ViewModel() {
 
@@ -53,6 +55,9 @@ class KaraokePartyController @Inject constructor(
     private val _currentSongLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val currentSongLyrics: StateFlow<List<LyricLine>> = _currentSongLyrics.asStateFlow()
     
+    private val _currentMp3Path = MutableStateFlow<String?>(null)
+    val currentMp3Path: StateFlow<String?> = _currentMp3Path.asStateFlow()
+    
     // === PREFETCH CACHE ===
     // Store prefetched song data by songId
     private val prefetchCache = mutableMapOf<String, CachedSongData>()
@@ -61,12 +66,12 @@ class KaraokePartyController @Inject constructor(
 
     /**
      * Prefetch song resources in background (called when song added to queue)
-     * Downloads and caches notes + lyrics for instant loading later
+     * Downloads and caches notes + lyrics + MP3 (host only) for instant loading later
      */
-    fun prefetchSong(song: QueueSong) {
+    fun prefetchSong(song: QueueSong, isHost: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                Log.d("KaraokeCtrl", "[Prefetch] Starting background prefetch for: ${song.title}")
+                Log.d("KaraokeCtrl", "[Prefetch] Starting prefetch for: ${song.title} (Host: $isHost)")
                 
                 // Check if already cached
                 if (prefetchCache.containsKey(song.id)) {
@@ -74,15 +79,28 @@ class KaraokePartyController @Inject constructor(
                     return@launch
                 }
                 
-                // Download and parse
+                // Download and parse JSON + LRC (all devices)
                 val (notes, lyrics) = downloadAndParseSong(song)
                 
-                // Store in cache
-                prefetchCache[song.id] = CachedSongData(notes, lyrics)
+                // Download MP3 to disk (host only)
+                val mp3FilePath = if (isHost && song.audioUrl.isNotEmpty()) {
+                    try {
+                        downloadMP3(song)
+                    } catch (e: Exception) {
+                        Log.e("KaraokeCtrl", "[Prefetch] MP3 download failed: ${e.message}")
+                        null
+                    }
+                } else {
+                    null
+                }
                 
-                Log.d("KaraokeCtrl", "[Prefetch] ✅ Cached ${notes.size} notes, ${lyrics.size} lyrics for: ${song.title}")
+                // Store in cache
+                prefetchCache[song.id] = CachedSongData(notes, lyrics, mp3FilePath)
+                
+                val mp3Status = if (mp3FilePath != null) "MP3 ✅" else "no MP3"
+                Log.d("KaraokeCtrl", "[Prefetch] ✅ Cached ${notes.size} notes, ${lyrics.size} lyrics, $mp3Status for: ${song.title}")
             } catch (e: Exception) {
-                Log.e("Karaoke Ctrl", "[Prefetch] ❌ Failed to prefetch ${song.title}: ${e.message}")
+                Log.e("KaraokeCtrl", "[Prefetch] ❌ Failed to prefetch ${song.title}: ${e.message}")
             }
         }
     }
@@ -109,8 +127,10 @@ class KaraokePartyController @Inject constructor(
                 // 4. Update State
                 _currentSongNotes.value = filteredNotes
                 _currentSongLyrics.value = lyrics
+                _currentMp3Path.value = cached?.mp3FilePath  // Set MP3 path (host only)
 
-                Log.d("KaraokeCtrl", "[LoadSong] ✅ Loaded ${filteredNotes.size} notes, ${lyrics.size} lyrics")
+                val mp3Status = if (cached?.mp3FilePath != null) "MP3 ready ✅" else "no MP3"
+                Log.d("KaraokeCtrl", "[LoadSong] ✅ Loaded ${filteredNotes.size} notes, ${lyrics.size} lyrics, $mp3Status")
 
                 // 5. Set Ready State
                 partyRepository.setMemberReady(roomId, userId, true)
@@ -192,6 +212,42 @@ class KaraokePartyController @Inject constructor(
         
         return Pair(filteredNotes, lyrics)
     }
+    
+    /**
+     * Helper: Download MP3 file to internal storage (host only)
+     * Returns path to downloaded file for instant playback
+     */
+    private suspend fun downloadMP3(song: QueueSong): String? {
+        try {
+            Log.d("KaraokeCtrl", "[DownloadMP3] Downloading: ${song.audioUrl}")
+            
+            // Create cache directory
+            val cacheDir = java.io.File(context.cacheDir, "karaoke_mp3")
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs()
+            }
+            
+            // Generate filename from song ID
+            val fileName = "song_${song.id}.mp3"
+            val outputFile = java.io.File(cacheDir, fileName)
+            
+            // Download MP3
+            val connection = URL(song.audioUrl).openConnection()
+            connection.connect()
+            
+            connection.getInputStream().use { input ->
+                outputFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            Log.d("KaraokeCtrl", "[DownloadMP3] ✅ Downloaded to: ${outputFile.absolutePath} (${outputFile.length() / 1024}KB)")
+            return outputFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("KaraokeCtrl", "[DownloadMP3] ❌ Failed: ${e.message}", e)
+            return null
+        }
+    }
 
     /**
      * Update user's karaoke score in Firebase
@@ -226,6 +282,7 @@ class KaraokePartyController @Inject constructor(
     fun clearSongData() {
         _currentSongNotes.value = emptyList()
         _currentSongLyrics.value = emptyList()
+        _currentMp3Path.value = null
     }
     
     /**
@@ -233,6 +290,16 @@ class KaraokePartyController @Inject constructor(
      * Called when song is removed from queue
      */
     fun removeSongFromCache(songId: String) {
+        // Delete MP3 file if exists
+        prefetchCache[songId]?.mp3FilePath?.let { path ->
+            try {
+                java.io.File(path).delete()
+                Log.d("KaraokeCtrl", "[Cache] Deleted MP3 file: $path")
+            } catch (e: Exception) {
+                Log.e("KaraokeCtrl", "[Cache] Failed to delete MP3: ${e.message}")
+            }
+        }
+        
         prefetchCache.remove(songId)
         Log.d("KaraokeCtrl", "[Cache] Removed song from cache: $songId")
     }
@@ -242,7 +309,18 @@ class KaraokePartyController @Inject constructor(
      * Called when leaving room or clearing queue
      */
     fun clearAllCache() {
+        // Delete all MP3 files
+        prefetchCache.values.forEach { cached ->
+            cached.mp3FilePath?.let { path ->
+                try {
+                    java.io.File(path).delete()
+                } catch (e: Exception) {
+                    Log.e("KaraokeCtrl", "[Cache] Failed to delete MP3: ${e.message}")
+                }
+            }
+        }
+        
         prefetchCache.clear()
-        Log.d("KaraokeCtrl", "[Cache] Cleared all cached songs")
+        Log.d("KaraokeCtrl", "[Cache] Cleared all cached songs and MP3 files")
     }
 }
