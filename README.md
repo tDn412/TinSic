@@ -24,7 +24,7 @@ Nhóm đã hoàn thành các module sau:
 
 #### a. Module Phát nhạc (Music Player)
 - **Core Player:** Sử dụng **ExoPlayer (Media3)** để xử lý luồng âm thanh chuẩn.
-- **Tính năng:** Phát/Tạm dừng, Chuyển bài, Thanh tiến độ (Seek bar).
+- **Tính năng:** Phát/Tạm dừng, Chuyển bài, Thanh tiến độ (Seek bar), Hiện lyric theo thời gian thực, dịch lyric.
 - **Background Service:** Hỗ trợ phát nhạc nền khi thoát ứng dụng.
 
 #### b. Module Karaoke thông minh (Tính năng nổi bật)
