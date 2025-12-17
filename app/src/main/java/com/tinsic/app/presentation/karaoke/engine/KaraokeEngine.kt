@@ -218,9 +218,10 @@ class KaraokeEngine @Inject constructor(
                      // Keep running if it's just missing resource, but time will be 0
                 }
                 
-                if (config.isPlaybackEnabled && player != null && !player.isPlaying && isRunning) {
-                     break
-                }
+                // WARNING: This check caused early exit during PREPARE phase (player exists but not started)
+                // if (config.isPlaybackEnabled && player != null && !player.isPlaying && isRunning) {
+                //      break
+                // }
 
                 // Calculate current time in song
                 val currentSec = if (config.isPlaybackEnabled) {
