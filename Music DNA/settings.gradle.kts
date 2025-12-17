@@ -1,23 +1,18 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        google()
         mavenCentral()
-        gradlePluginPortal()
-    }
+        gradlePluginPortal()    }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+        // THÊM DÒNG NÀY VÀO ĐỂ SỬA LỖI
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
-rootProject.name = "My Application"
+rootProject.name = "Music DNA"
 include(":app")

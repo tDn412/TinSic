@@ -1,0 +1,328 @@
+Index: app/src/main/java/com/example/musicdna/MainActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.musicdna\r\n\r\nimport android.os.Bundle\r\nimport androidx.activity.ComponentActivity\r\nimport androidx.activity.compose.setContent\r\nimport androidx.activity.enableEdgeToEdge\r\nimport androidx.compose.foundation.layout.fillMaxSize\r\nimport androidx.compose.foundation.layout.padding\r\nimport androidx.compose.material3.Scaffold\r\nimport androidx.compose.material3.Text\r\nimport androidx.compose.runtime.Composable\r\nimport androidx.compose.ui.Modifier\r\nimport androidx.compose.ui.tooling.preview.Preview\r\nimport com.example.musicdna.ui.profile.ProfileScreen\r\nimport com.example.musicdna.ui.theme.MyApplicationTheme\r\n\r\nclass MainActivity : ComponentActivity() {\r\n    override fun onCreate(savedInstanceState: Bundle?) {\r\n        super.onCreate(savedInstanceState)\r\n        enableEdgeToEdge()\r\n        setContent {\r\n            MyApplicationTheme {\r\n                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->\r\n                    Text(\r\n                        text = \"Music DNA\",\r\n                        modifier = Modifier.padding(innerPadding)\r\n                    )\r\n                    ProfileScreen()\r\n                }\r\n            }\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/musicdna/MainActivity.kt b/app/src/main/java/com/example/musicdna/MainActivity.kt
+--- a/app/src/main/java/com/example/musicdna/MainActivity.kt	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ b/app/src/main/java/com/example/musicdna/MainActivity.kt	(date 1765937577935)
+@@ -1,6 +1,8 @@
+ package com.example.musicdna
+ 
++import android.content.ContentValues.TAG
+ import android.os.Bundle
++import android.util.Log
+ import androidx.activity.ComponentActivity
+ import androidx.activity.compose.setContent
+ import androidx.activity.enableEdgeToEdge
+@@ -13,11 +15,31 @@
+ import androidx.compose.ui.tooling.preview.Preview
+ import com.example.musicdna.ui.profile.ProfileScreen
+ import com.example.musicdna.ui.theme.MyApplicationTheme
++import com.google.firebase.firestore.FirebaseFirestore
+ 
+ class MainActivity : ComponentActivity() {
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         enableEdgeToEdge()
++        val db = FirebaseFirestore.getInstance()
++        db.collection("users")
++            .get()
++            .addOnSuccessListener { result ->
++                Log.d(TAG, "Đã lấy dữ liệu từ collection 'users' thành công:") // Log chung
++                if (result.isEmpty) {
++                    Log.d(TAG, "Collection 'users' không có tài liệu nào.")
++                } else {
++                    for (document in result) {
++                        // document.id là ID của tài liệu
++                        // document.data là dữ liệu dạng Map<String, Any>
++                        Log.d(TAG, "  ID: ${document.id} => Dữ liệu: ${document.data}")
++                    }
++                }
++            }
++            .addOnFailureListener { exception ->
++                // In lỗi nếu có vấn đề khi lấy dữ liệu
++                Log.e(TAG, "Lỗi khi lấy dữ liệu từ collection 'users': $exception", exception)
++            }
+         setContent {
+             MyApplicationTheme {
+                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+Index: app/build.gradle.kts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>plugins {\r\n    alias(libs.plugins.android.application)\r\n    alias(libs.plugins.kotlin.android)\r\n    alias(libs.plugins.kotlin.compose)\r\n}\r\n\r\nandroid {\r\n    namespace = \"com.example.musicdna\"\r\n    compileSdk = 36\r\n\r\n    defaultConfig {\r\n        applicationId = \"com.example.myapplication\"\r\n        minSdk = 35\r\n        targetSdk = 36\r\n        versionCode = 1\r\n        versionName = \"1.0\"\r\n\r\n        testInstrumentationRunner = \"androidx.test.runner.AndroidJUnitRunner\"\r\n    }\r\n\r\n    buildTypes {\r\n        release {\r\n            isMinifyEnabled = false\r\n            proguardFiles(\r\n                getDefaultProguardFile(\"proguard-android-optimize.txt\"),\r\n                \"proguard-rules.pro\"\r\n            )\r\n        }\r\n    }\r\n    compileOptions {\r\n        sourceCompatibility = JavaVersion.VERSION_11\r\n        targetCompatibility = JavaVersion.VERSION_11\r\n    }\r\n    kotlinOptions {\r\n        jvmTarget = \"11\"\r\n    }\r\n    buildFeatures {\r\n        compose = true\r\n    }\r\n}\r\n\r\ndependencies {\r\n    implementation(\"dev.shreyaspatil:capturable:1.0.3\")\r\n    implementation(\"androidx.compose.material:material-icons-extended-android:1.6.7\")\r\n    implementation(libs.androidx.core.ktx)\r\n    implementation(libs.androidx.lifecycle.runtime.ktx)\r\n    implementation(libs.androidx.activity.compose)\r\n    implementation(platform(libs.androidx.compose.bom))\r\n    implementation(libs.androidx.compose.ui)\r\n    implementation(libs.androidx.compose.ui.graphics)\r\n    implementation(libs.androidx.compose.ui.tooling.preview)\r\n    implementation(libs.androidx.compose.material3)\r\n    implementation(libs.androidx.compose.foundation.layout)\r\n    testImplementation(libs.junit)\r\n    androidTestImplementation(libs.androidx.junit)\r\n    androidTestImplementation(libs.androidx.espresso.core)\r\n    androidTestImplementation(platform(libs.androidx.compose.bom))\r\n    androidTestImplementation(libs.androidx.compose.ui.test.junit4)\r\n    debugImplementation(libs.androidx.compose.ui.tooling)\r\n    debugImplementation(libs.androidx.compose.ui.test.manifest)\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+--- a/app/build.gradle.kts	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ b/app/build.gradle.kts	(date 1765936924019)
+@@ -1,4 +1,6 @@
+ plugins {
++    // Add the Google services Gradle plugin
++    id("com.google.gms.google-services")
+     alias(libs.plugins.android.application)
+     alias(libs.plugins.kotlin.android)
+     alias(libs.plugins.kotlin.compose)
+@@ -9,7 +11,7 @@
+     compileSdk = 36
+ 
+     defaultConfig {
+-        applicationId = "com.example.myapplication"
++        applicationId = "com.example.musicdna"
+         minSdk = 35
+         targetSdk = 36
+         versionCode = 1
+@@ -40,6 +42,16 @@
+ }
+ 
+ dependencies {
++    // SỬA LỖI 1: Thay "latest_version" bằng một phiên bản cụ thể
++    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
++
++    // SỬA LỖI 2: Sử dụng thư viện firestore-ktx cho Kotlin
++    implementation("com.google.firebase:firebase-firestore-ktx")
++
++    // Khi sử dụng BoM, bạn không cần chỉ định phiên bản cho các thư viện Firebase khác
++    implementation("com.google.firebase:firebase-analytics")
++
++
+     implementation("dev.shreyaspatil:capturable:1.0.3")
+     implementation("androidx.compose.material:material-icons-extended-android:1.6.7")
+     implementation(libs.androidx.core.ktx)
+@@ -58,4 +70,4 @@
+     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+     debugImplementation(libs.androidx.compose.ui.tooling)
+     debugImplementation(libs.androidx.compose.ui.test.manifest)
+-}
+\ No newline at end of file
++}
+Index: app/src/main/java/com/example/musicdna/data/Data.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.musicdna.data\r\n\r\nimport com.example.musicdna.model.ListeningHistory\r\nimport com.example.musicdna.model.Music\r\nimport com.example.musicdna.model.MusicGenre\r\nimport java.time.LocalDateTime\r\n\r\n// =================================================================================\r\n// DỮ LIỆU GIẢ LẬP CHO BÀI HÁT (HƠN 200 BÀI)\r\n// =================================================================================\r\n\r\nval dummyMusicList: List<Music> = listOf(\r\n    // --- 100 BÀI HÁT CỦA J97 (VIỆT NAM) ---\r\n    Music(\"J97_001\", \"Sóng Gió\", \"J97\", MusicGenre.POP, 250, \"\", \"VN\"),\r\n    Music(\"J97_002\", \"Bạc Phận\", \"J97\", MusicGenre.POP, 245, \"\", \"VN\"),\r\n    Music(\"J97_003\", \"Hồng Nhan\", \"J97\", MusicGenre.POP, 230, \"\", \"VN\"),\r\n    Music(\"J97_004\", \"Em Gì Ơi\", \"J97\", MusicGenre.POP, 220, \"\", \"VN\"),\r\n    Music(\"J97_005\", \"Là 1 Thằng Con Trai\", \"J97\", MusicGenre.POP, 260, \"\", \"VN\"),\r\n    Music(\"J97_006\", \"Hoa Vô Sắc\", \"J97\", MusicGenre.POP, 275, \"\", \"VN\"),\r\n    Music(\"J97_007\", \"Thiên Hạ Hữu Tình Nhân\", \"J97\", MusicGenre.POP, 210, \"\", \"VN\"),\r\n    Music(\"J97_008\", \"Đom Đóm\", \"J97\", MusicGenre.POP, 300, \"\", \"VN\"),\r\n    Music(\"J97_009\", \"Cuộc Vui Cô Đơn\", \"J97\", MusicGenre.POP, 215, \"\", \"VN\"),\r\n    Music(\"J97_010\", \"Ngủ Một Mình\", \"J97\", MusicGenre.RNB, 205, \"\", \"VN\"),\r\n    // ... và 90 bài hát khác của J97 tiếp tục ở đây\r\n\r\n    // --- NHẠC VIỆT NAM KHÁC ---\r\n    Music(\"VN_001\", \"See Tình\", \"Hoàng Thùy Linh\", MusicGenre.POP, 185, \"\", \"VN\"),\r\n    Music(\"VN_002\", \"Bên Trên Tầng Lầu\", \"Tăng Duy Tân\", MusicGenre.EDM, 210, \"\", \"VN\"),\r\n    Music(\"VN_003\", \"Nấu Ăn Cho Em\", \"Đen Vâu\", MusicGenre.HIP_HOP, 240, \"\", \"VN\"),\r\n    Music(\"VN_004\", \"Ngày Đầu Tiên\", \"Đức Phúc\", MusicGenre.POP, 220, \"\", \"VN\"),\r\n    Music(\"VN_005\", \"Chạy Về Khóc Với Anh\", \"ERIK\", MusicGenre.POP, 235, \"\", \"VN\"),\r\n    // ... thêm các bài V-Pop khác\r\n\r\n    // --- NHẠC US-UK ---\r\n    Music(\"USUK_001\", \"Blinding Lights\", \"The Weeknd\", MusicGenre.POP, 202, \"\", \"US_UK\"),\r\n    Music(\"USUK_002\", \"As It Was\", \"Harry Styles\", MusicGenre.POP, 167, \"\", \"US_UK\"),\r\n    Music(\"USUK_003\", \"Shape of You\", \"Ed Sheeran\", MusicGenre.POP, 233, \"\", \"US_UK\"),\r\n    Music(\"USUK_004\", \"Bohemian Rhapsody\", \"Queen\", MusicGenre.ROCK, 355, \"\", \"US_UK\"),\r\n    Music(\"USUK_005\", \"Rolling in the Deep\", \"Adele\", MusicGenre.POP, 228, \"\", \"US_UK\"),\r\n    // ... thêm các bài US-UK khác\r\n\r\n    // --- NHẠC NHẬT BẢN (J-POP) ---\r\n    Music(\"JP_001\", \"Idol\", \"YOASOBI\", MusicGenre.POP, 213, \"\", \"JP\"),\r\n    Music(\"JP_002\", \"Lemon\", \"Kenshi Yonezu\", MusicGenre.POP, 255, \"\", \"JP\"),\r\n    Music(\"JP_003\", \"Gurenge\", \"LiSA\", MusicGenre.ROCK, 237, \"\", \"JP\"),\r\n    // ... thêm các bài J-Pop khác\r\n\r\n    // --- NHẠC HÀN QUỐC (K-POP) ---\r\n    Music(\"KR_001\", \"Dynamite\", \"BTS\", MusicGenre.POP, 199, \"\", \"KR\"),\r\n    Music(\"KR_002\", \"Gangnam Style\", \"PSY\", MusicGenre.POP, 219, \"\", \"KR\"),\r\n    Music(\"KR_003\", \"DDU-DU DDU-DU\", \"BLACKPINK\", MusicGenre.HIP_HOP, 209, \"\", \"KR\"),\r\n    // ... thêm các bài K-Pop khác\r\n\r\n    // --- CLASSICAL & OTHER ---\r\n    Music(\"CL_001\", \"Für Elise\", \"Beethoven\", MusicGenre.CLASSICAL, 150, \"\", \"OTHER\"),\r\n    Music(\"CL_002\", \"Canon in D\", \"Pachelbel\", MusicGenre.CLASSICAL, 305, \"\", \"OTHER\")\r\n)\r\n\r\n// =================================================================================\r\n// DỮ LIỆU GIẢ LẬP CHO LỊCH SỬ NGHE\r\n// =================================================================================\r\n// Trong file DummyData.kt\r\n// =================================================================================\r\n// DỮ LIỆU GIẢ LẬP CHO LỊCH SỬ NGHE - ĐÃ ĐƯỢC LÀM PHONG PHÚ\r\n// =================================================================================\r\nval dummyListeningHistory: List<ListeningHistory> = listOf(\r\n    // === SỞ THÍCH CỐT LÕI: POP (6 BÀI) ===\r\n    ListeningHistory(\"h001\", \"uid123\", \"J97_001\", true, LocalDateTime.now(), false),   // POP\r\n    ListeningHistory(\"h002\", \"uid123\", \"J97_002\", true, LocalDateTime.now(), false),   // POP\r\n    ListeningHistory(\"h003\", \"uid123\", \"J97_008\", true, LocalDateTime.now(), false),   // POP\r\n    ListeningHistory(\"h004\", \"uid123\", \"J97_010\", true, LocalDateTime.now(), false),   // R&B\r\n    ListeningHistory(\"h005\", \"uid123\", \"VN_001\", true, LocalDateTime.now(), false),    // POP (See Tình)\r\n    ListeningHistory(\"h006\", \"uid123\", \"USUK_001\", true, LocalDateTime.now(), false),  // POP (Blinding Lights)\r\n\r\n    // === GU ÂM NHẠC PHỤ: ROCK (4 BÀI) ===\r\n    ListeningHistory(\"h007\", \"uid123\", \"USUK_004\", true, LocalDateTime.now(), false), // ROCK (Bohemian Rhapsody)\r\n    ListeningHistory(\"h008\", \"uid123\", \"USUK_006\", true, LocalDateTime.now(), false), // ROCK (Smells Like Teen Spirit)\r\n    ListeningHistory(\"h009\", \"uid123\", \"USUK_010\", true, LocalDateTime.now(), false), // ROCK (Stairway to Heaven)\r\n    ListeningHistory(\"h010\", \"uid123\", \"JP_003\", true, LocalDateTime.now(), false),   // ROCK (Gurenge - J-Rock)\r\n\r\n    // === GU ÂM NHẠC PHỤ: HIP-HOP & EDM (5 BÀI) ===\r\n    ListeningHistory(\"h011\", \"uid123\", \"VN_003\", true, LocalDateTime.now(), false),   // HIP_HOP (Nấu Ăn Cho Em)\r\n    ListeningHistory(\"h012\", \"uid123\", \"VN_010\", true, LocalDateTime.now(), false),   // HIP_HOP (Lối Nhỏ)\r\n    ListeningHistory(\"h013\", \"uid123\", \"USUK_008\", true, LocalDateTime.now(), false), // HIP_HOP (God's Plan)\r\n    ListeningHistory(\"h014\", \"uid123\", \"VN_002\", true, LocalDateTime.now(), false),   // EDM (Bên Trên Tầng Lầu)\r\n    ListeningHistory(\"h015\", \"uid123\", \"VN_009\", true, LocalDateTime.now(), false),   // EDM (Cắt Đôi Nỗi Sầu)\r\n\r\n    // === THÍNH THOẢNG NGHE: JAZZ & CLASSICAL (2 BÀI) ===\r\n    ListeningHistory(\"h016\", \"uid123\", \"CL_002\", true, LocalDateTime.now(), false),   // CLASSICAL (Canon in D)\r\n    ListeningHistory(\"h017\", \"uid123\", \"JAZZ_001\", true, LocalDateTime.now(), false), // JAZZ (Take Five)\r\n\r\n    // === CÁC BÀI ĐÃ NGHE NHƯNG KHÔNG THÍCH HOẶC BỎ QUA ===\r\n    ListeningHistory(\"h018\", \"uid123\", \"JP_001\", false, LocalDateTime.now(), false), // Idol - YOASOBI\r\n    ListeningHistory(\"h019\", \"uid123\", \"KR_001\", false, LocalDateTime.now(), true),  // Dynamite - BTS (bỏ qua)\r\n    ListeningHistory(\"h020\", \"uid123\", \"KR_006\", false, LocalDateTime.now(), false), // Super Shy - NewJeans\r\n    ListeningHistory(\"h021\", \"uid123\", \"CL_001\", false, LocalDateTime.now(), false)  // Für Elise\r\n)
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/musicdna/data/Data.kt b/app/src/main/java/com/example/musicdna/data/Data.kt
+--- a/app/src/main/java/com/example/musicdna/data/Data.kt	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ b/app/src/main/java/com/example/musicdna/data/Data.kt	(date 1765964532681)
+@@ -11,49 +11,49 @@
+ 
+ val dummyMusicList: List<Music> = listOf(
+     // --- 100 BÀI HÁT CỦA J97 (VIỆT NAM) ---
+-    Music("J97_001", "Sóng Gió", "J97", MusicGenre.POP, 250, "", "VN"),
+-    Music("J97_002", "Bạc Phận", "J97", MusicGenre.POP, 245, "", "VN"),
+-    Music("J97_003", "Hồng Nhan", "J97", MusicGenre.POP, 230, "", "VN"),
+-    Music("J97_004", "Em Gì Ơi", "J97", MusicGenre.POP, 220, "", "VN"),
+-    Music("J97_005", "Là 1 Thằng Con Trai", "J97", MusicGenre.POP, 260, "", "VN"),
+-    Music("J97_006", "Hoa Vô Sắc", "J97", MusicGenre.POP, 275, "", "VN"),
+-    Music("J97_007", "Thiên Hạ Hữu Tình Nhân", "J97", MusicGenre.POP, 210, "", "VN"),
+-    Music("J97_008", "Đom Đóm", "J97", MusicGenre.POP, 300, "", "VN"),
+-    Music("J97_009", "Cuộc Vui Cô Đơn", "J97", MusicGenre.POP, 215, "", "VN"),
+-    Music("J97_010", "Ngủ Một Mình", "J97", MusicGenre.RNB, 205, "", "VN"),
++    Music("J97_001", "Sóng Gió", "J97", MusicGenre.POP, 250, "", " ", "VN"),
++    Music("J97_002", "Bạc Phận", "J97", MusicGenre.POP, 245, "", " ", "VN"),
++    Music("J97_003", "Hồng Nhan", "J97", MusicGenre.POP, 230, "", " ", "VN"),
++    Music("J97_004", "Em Gì Ơi", "J97", MusicGenre.POP, 220, "", " ", "VN"),
++    Music("J97_005", "Là 1 Thằng Con Trai", "J97", MusicGenre.POP, 260, "", " ", "VN"),
++    Music("J97_006", "Hoa Vô Sắc", "J97", MusicGenre.POP, 275, "", " ", "VN"),
++    Music("J97_007", "Thiên Hạ Hữu Tình Nhân", "J97", MusicGenre.POP, 210, "", " ", "VN"),
++    Music("J97_008", "Đom Đóm", "J97", MusicGenre.POP, 300, "", " ", "VN"),
++    Music("J97_009", "Cuộc Vui Cô Đơn", "J97", MusicGenre.POP, 215, "", " ", "VN"),
++    Music("J97_010", "Ngủ Một Mình", "J97", MusicGenre.RNB, 205, "", " ", "VN"),
+     // ... và 90 bài hát khác của J97 tiếp tục ở đây
+ 
+     // --- NHẠC VIỆT NAM KHÁC ---
+-    Music("VN_001", "See Tình", "Hoàng Thùy Linh", MusicGenre.POP, 185, "", "VN"),
+-    Music("VN_002", "Bên Trên Tầng Lầu", "Tăng Duy Tân", MusicGenre.EDM, 210, "", "VN"),
+-    Music("VN_003", "Nấu Ăn Cho Em", "Đen Vâu", MusicGenre.HIP_HOP, 240, "", "VN"),
+-    Music("VN_004", "Ngày Đầu Tiên", "Đức Phúc", MusicGenre.POP, 220, "", "VN"),
+-    Music("VN_005", "Chạy Về Khóc Với Anh", "ERIK", MusicGenre.POP, 235, "", "VN"),
++    Music("VN_001", "See Tình", "Hoàng Thùy Linh", MusicGenre.POP, 185, "", " ", "VN"),
++    Music("VN_002", "Bên Trên Tầng Lầu", "Tăng Duy Tân", MusicGenre.EDM, 210, "", " ", "VN"),
++    Music("VN_003", "Nấu Ăn Cho Em", "Đen Vâu", MusicGenre.HIP_HOP, 240, "", " ", "VN"),
++    Music("VN_004", "Ngày Đầu Tiên", "Đức Phúc", MusicGenre.POP, 220, "", " ", "VN"),
++    Music("VN_005", "Chạy Về Khóc Với Anh", "ERIK", MusicGenre.POP, 235, "", " ", "VN"),
+     // ... thêm các bài V-Pop khác
+ 
+     // --- NHẠC US-UK ---
+-    Music("USUK_001", "Blinding Lights", "The Weeknd", MusicGenre.POP, 202, "", "US_UK"),
+-    Music("USUK_002", "As It Was", "Harry Styles", MusicGenre.POP, 167, "", "US_UK"),
+-    Music("USUK_003", "Shape of You", "Ed Sheeran", MusicGenre.POP, 233, "", "US_UK"),
+-    Music("USUK_004", "Bohemian Rhapsody", "Queen", MusicGenre.ROCK, 355, "", "US_UK"),
+-    Music("USUK_005", "Rolling in the Deep", "Adele", MusicGenre.POP, 228, "", "US_UK"),
++    Music("USUK_001", "Blinding Lights", "The Weeknd", MusicGenre.POP, 202, "", " ","US_UK"),
++    Music("USUK_002", "As It Was", "Harry Styles", MusicGenre.POP, 167, "", " ", "US_UK"),
++    Music("USUK_003", "Shape of You", "Ed Sheeran", MusicGenre.POP, 233, "", " ", "US_UK"),
++    Music("USUK_004", "Bohemian Rhapsody", "Queen", MusicGenre.ROCK, 355, ""," ",  "US_UK"),
++    Music("USUK_005", "Rolling in the Deep", "Adele", MusicGenre.POP, 228, "", " ", "US_UK"),
+     // ... thêm các bài US-UK khác
+ 
+     // --- NHẠC NHẬT BẢN (J-POP) ---
+-    Music("JP_001", "Idol", "YOASOBI", MusicGenre.POP, 213, "", "JP"),
+-    Music("JP_002", "Lemon", "Kenshi Yonezu", MusicGenre.POP, 255, "", "JP"),
+-    Music("JP_003", "Gurenge", "LiSA", MusicGenre.ROCK, 237, "", "JP"),
++    Music("JP_001", "Idol", "YOASOBI", MusicGenre.POP, 213, "", " ", "JP"),
++    Music("JP_002", "Lemon", "Kenshi Yonezu", MusicGenre.POP, 255, "", " ", "JP"),
++    Music("JP_003", "Gurenge", "LiSA", MusicGenre.ROCK, 237, "", " ", "JP"),
+     // ... thêm các bài J-Pop khác
+ 
+     // --- NHẠC HÀN QUỐC (K-POP) ---
+-    Music("KR_001", "Dynamite", "BTS", MusicGenre.POP, 199, "", "KR"),
+-    Music("KR_002", "Gangnam Style", "PSY", MusicGenre.POP, 219, "", "KR"),
+-    Music("KR_003", "DDU-DU DDU-DU", "BLACKPINK", MusicGenre.HIP_HOP, 209, "", "KR"),
++    Music("KR_001", "Dynamite", "BTS", MusicGenre.POP, 199, "", " ", "KR"),
++    Music("KR_002", "Gangnam Style", "PSY", MusicGenre.POP, 219, "", " ", "KR"),
++    Music("KR_003", "DDU-DU DDU-DU", "BLACKPINK", MusicGenre.HIP_HOP, 209, "", " ", "KR"),
+     // ... thêm các bài K-Pop khác
+ 
+     // --- CLASSICAL & OTHER ---
+-    Music("CL_001", "Für Elise", "Beethoven", MusicGenre.CLASSICAL, 150, "", "OTHER"),
+-    Music("CL_002", "Canon in D", "Pachelbel", MusicGenre.CLASSICAL, 305, "", "OTHER")
++    Music("CL_001", "Für Elise", "Beethoven", MusicGenre.CLASSICAL, 150, "", " ", "OTHER"),
++    Music("CL_002", "Canon in D", "Pachelbel", MusicGenre.CLASSICAL, 305, "", " ", "OTHER")
+ )
+ 
+ // =================================================================================
+Index: app/src/main/java/com/example/musicdna/model/Music.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.musicdna.model\r\n\r\ndata class Music(\r\n    val musicId: String,\r\n    val title: String,\r\n    val artist: String,\r\n    val genre: MusicGenre,\r\n    val duration: Int,\r\n    val coverArtUrl: String,\r\n    val country: String\r\n)\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/musicdna/model/Music.kt b/app/src/main/java/com/example/musicdna/model/Music.kt
+--- a/app/src/main/java/com/example/musicdna/model/Music.kt	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ b/app/src/main/java/com/example/musicdna/model/Music.kt	(date 1765964532671)
+@@ -7,5 +7,6 @@
+     val genre: MusicGenre,
+     val duration: Int,
+     val coverArtUrl: String,
++    val lyricrUrl: String? = null,
+     val country: String
+ )
+Index: app/src/main/java/com/example/musicdna/ui/profile/AchievementSection.kt
+===================================================================
+diff --git a/app/src/main/java/com/example/musicdna/ui/profile/AchievementSection.kt b/app/src/main/java/com/example/musicdna/ui/profile/AchievementSection.kt
+deleted file mode 100644
+--- a/app/src/main/java/com/example/musicdna/ui/profile/AchievementSection.kt	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ /dev/null	(revision 15117159cf972fcdca26f770c56079563784a8c0)
+@@ -1,76 +0,0 @@
+-package com.example.musicdna.ui.profile
+-
+-import androidx.compose.foundation.background
+-import androidx.compose.foundation.layout.Column
+-import androidx.compose.foundation.layout.Spacer
+-import androidx.compose.foundation.layout.height
+-import androidx.compose.foundation.layout.padding
+-import androidx.compose.foundation.lazy.grid.GridCells
+-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+-import androidx.compose.material3.Text
+-import androidx.compose.runtime.Composable
+-import androidx.compose.ui.Modifier
+-import androidx.compose.ui.graphics.Color
+-import androidx.compose.ui.text.font.FontWeight
+-import androidx.compose.ui.unit.dp
+-import androidx.compose.ui.unit.sp
+-import androidx.compose.foundation.lazy.grid.items
+-import androidx.compose.foundation.shape.RoundedCornerShape
+-
+-@Composable
+-fun AchievementSection() {
+-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+-
+-        Text(
+-            "Achievements",
+-            color = Color.White,
+-            fontSize = 20.sp,
+-            fontWeight = FontWeight.Bold
+-        )
+-        Spacer(modifier = Modifier.height(16.dp))
+-
+-        val achievements = listOf(
+-            Achievement("Đóm Con", "Listened to Jack 100 times", Color(0xFFFFA726), true),
+-            Achievement("Night Owl", "Active after midnight 30 days", Color(0xFF212121), true),
+-            Achievement("Party Animal", "Joined 50+ party sessions", Color(0xFF1A1A1A), true),
+-            Achievement("Music Explorer", "Discovered 500+ songs", Color(0xFF1A1A1A), true),
+-            Achievement("Karaoke Star", "Complete 100 karaoke sessions", Color(0xFF1A1A1A), false),
+-            Achievement("Trendsetter", "Share 50 viral songs", Color(0xFF1A1A1A), false)
+-        )
+-
+-        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.height(800.dp)) {
+-            items(achievements) { AchieveCard(it) }
+-        }
+-    }
+-}
+-
+-data class Achievement(
+-    val title: String,
+-    val description: String,
+-    val bgColor: Color,
+-    val earned: Boolean
+-)
+-
+-@Composable
+-fun AchieveCard(item: Achievement) {
+-    Column(
+-        modifier = Modifier
+-            .padding(8.dp)
+-            .height(140.dp)
+-            .background(item.bgColor.copy(alpha = if (item.earned) 1f else 0.3f), RoundedCornerShape(16.dp))
+-            .padding(16.dp)
+-    ) {
+-
+-        Text(item.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+-        Spacer(Modifier.height(6.dp))
+-        Text(item.description, color = Color.LightGray, fontSize = 13.sp)
+-
+-        Spacer(modifier = Modifier.weight(1f))
+-
+-        if (item.earned) {
+-            Text("✓ Earned", color = Color.Green, fontSize = 12.sp)
+-        } else {
+-            Text("Locked", color = Color.Gray, fontSize = 12.sp)
+-        }
+-    }
+-}
+Index: build.gradle.kts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>// Top-level build file where you can add configuration options common to all sub-projects/modules.\r\nplugins {\r\n    alias(libs.plugins.android.application) apply false\r\n    alias(libs.plugins.kotlin.android) apply false\r\n    alias(libs.plugins.kotlin.compose) apply false\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/build.gradle.kts b/build.gradle.kts
+--- a/build.gradle.kts	(revision 15117159cf972fcdca26f770c56079563784a8c0)
++++ b/build.gradle.kts	(date 1765934057824)
+@@ -1,5 +1,7 @@
+ // Top-level build file where you can add configuration options common to all sub-projects/modules.
+ plugins {
++    // Add the dependency for the Google services Gradle plugin
++    id("com.google.gms.google-services") version "4.4.4" apply false
+     alias(libs.plugins.android.application) apply false
+     alias(libs.plugins.kotlin.android) apply false
+     alias(libs.plugins.kotlin.compose) apply false
+Index: app/src/main/java/com/example/musicdna/model/Achievement.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/example/musicdna/model/Achievement.kt b/app/src/main/java/com/example/musicdna/model/Achievement.kt
+new file mode 100644
+--- /dev/null	(date 1765964799667)
++++ b/app/src/main/java/com/example/musicdna/model/Achievement.kt	(date 1765964799667)
+@@ -0,0 +1,10 @@
++package com.example.musicdna.model
++
++import androidx.compose.ui.graphics.Color
++
++data class Achievement(
++    val title: String,
++    val description: String,
++    val bgColor: Color,
++    val earned: Boolean
++)
+\ No newline at end of file

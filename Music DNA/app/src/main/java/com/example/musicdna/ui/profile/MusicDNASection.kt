@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,45 +26,34 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.musicdna.model.ListeningHistory
-import com.example.musicdna.model.Music
-import com.example.musicdna.model.MusicGenre
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import com.example.musicdna.data.dummyListeningHistory
 import com.example.musicdna.data.dummyMusicList
+import com.example.musicdna.model.HistoryItem
+import com.example.musicdna.model.Music
 import kotlin.math.cos
 import kotlin.math.sin
 
-
 // ===============================================
-// 2. HÀM TÍNH TOÁN DNA
+// 1. LOGIC TÍNH TOÁN (ĐÃ SỬA VỀ STRING)
 // ===============================================
-
-/**
- * Tính toán tỷ lệ phần trăm các thể loại nhạc dựa trên các bài hát yêu thích.
- */
 fun calculateMusicDNA(
-    history: List<ListeningHistory>,
+    history: List<HistoryItem>,
     musicList: List<Music>
-): Map<MusicGenre, Float> {
-    // Lấy ra danh sách các bài hát yêu thích
-    val favoriteMusicIds = history.filter { it.isFavourite }.map { it.musicId }.toSet()
-
+): Map<String, Float> {
+    val favoriteMusicIds = history.map { it.id }.toSet()
     if (favoriteMusicIds.isEmpty()) return emptyMap()
 
-    // Đếm số lượng bài hát yêu thích cho mỗi thể loại
+    // Group theo String (it.genre)
     val genreCounts = musicList
-        .filter { it.musicId in favoriteMusicIds }
+        .filter { it.id in favoriteMusicIds }
         .groupingBy { it.genre }
         .eachCount()
 
-    val totalFavorites = favoriteMusicIds.size.toFloat()
-
-    // Chuyển đổi số lượng thành phần trăm và chuẩn hóa về thang 100 để vẽ
     val maxCount = genreCounts.maxOfOrNull { it.value }?.toFloat() ?: 1f
 
     return genreCounts.mapValues { (_, count) ->
@@ -73,13 +61,136 @@ fun calculateMusicDNA(
     }
 }
 
+// ===============================================
+// 2. BIỂU ĐỒ RADAR CHART (KHÔNG DÙNG ENUM)
+// ===============================================
+@OptIn(ExperimentalTextApi::class)
+@Composable
+fun RadarChart(
+    dnaData: Map<String, Float>, // <--- Tham số nhận String
+    modifier: Modifier = Modifier
+) {
+    // KHAI BÁO CÁC TRỤC CỦA BIỂU ĐỒ BẰNG STRING
+    // Bạn có thể thêm bớt tuỳ ý tại đây
+    val chartGenres = listOf("POP", "ROCK", "EDM", "HIP HOP", "JAZZ", "CLASSICAL")
+
+    val textMeasurer = rememberTextMeasurer()
+
+    Canvas(modifier = modifier) {
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+        val radius = size.minDimension / 2 * 0.8f
+        val angleBetweenAxes = 360f / chartGenres.size
+
+        // Vẽ lưới và trục
+        drawGridAndAxes(chartGenres.size, radius, angleBetweenAxes, center)
+
+        // Vẽ vùng dữ liệu DNA
+        val dnaPath = Path()
+        chartGenres.forEachIndexed { index, genreName ->
+            // Tìm giá trị trong Map.
+            // Cố gắng tìm chính xác, hoặc tìm phiên bản thay thế dấu gạch dưới nếu cần
+            val value = dnaData[genreName]
+                ?: dnaData[genreName.replace(" ", "_")] // Thử tìm kiểu "HIP_HOP" nếu "HIP HOP" ko có
+                ?: dnaData[genreName.uppercase()]       // Thử tìm kiểu viết hoa toàn bộ
+                ?: 0f
+
+            val angle = (angleBetweenAxes * index - 90).toDouble()
+            val pointRadius = radius * (value / 100f)
+            val x = centerX + (pointRadius * cos(Math.toRadians(angle))).toFloat()
+            val y = centerY + (pointRadius * sin(Math.toRadians(angle))).toFloat()
+
+            if (index == 0) {
+                dnaPath.moveTo(x, y)
+            } else {
+                dnaPath.lineTo(x, y)
+            }
+        }
+        dnaPath.close()
+
+        drawPath(dnaPath, color = Color(0xFF8B1FA0).copy(alpha = 0.7f), style = Fill)
+        drawPath(dnaPath, color = Color(0xFFB26CFF), style = Stroke(width = 3.dp.toPx()))
+
+        // Vẽ nhãn (labels)
+        drawLabels(chartGenres, radius, angleBetweenAxes, center, textMeasurer)
+    }
+}
 
 // ===============================================
-// 3. COMPOSABLE CHÍNH
+// 3. CÁC HÀM VẼ PHỤ TRỢ
 // ===============================================
+private fun DrawScope.drawGridAndAxes(
+    sides: Int,
+    radius: Float,
+    angleBetween: Float,
+    center: Offset
+) {
+    val gridLevels = 4
+    val gridColor = Color.Gray.copy(alpha = 0.5f)
+
+    (1..gridLevels).forEach { level ->
+        val levelRadius = radius * level / gridLevels
+        val path = Path()
+        (0 until sides).forEach { i ->
+            val angle = (angleBetween * i - 90).toDouble()
+            val x = center.x + (levelRadius * cos(Math.toRadians(angle))).toFloat()
+            val y = center.y + (levelRadius * sin(Math.toRadians(angle))).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        drawPath(path, color = gridColor, style = Stroke(width = 1.dp.toPx()))
+    }
+
+    (0 until sides).forEach { i ->
+        val angle = (angleBetween * i - 90).toDouble()
+        val x = center.x + (radius * cos(Math.toRadians(angle))).toFloat()
+        val y = center.y + (radius * sin(Math.toRadians(angle))).toFloat()
+        drawLine(
+            color = gridColor,
+            start = center,
+            end = Offset(x, y),
+            strokeWidth = 1.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@OptIn(ExperimentalTextApi::class)
+private fun DrawScope.drawLabels(
+    genres: List<String>, // <--- Nhận List<String>
+    radius: Float,
+    angleBetween: Float,
+    center: Offset,
+    textMeasurer: TextMeasurer
+) {
+    val labelOffset = 1.2f
+    genres.forEachIndexed { i, genreName ->
+        val angle = (angleBetween * i - 90).toDouble()
+        val textRadius = radius * labelOffset
+        val x = center.x + (textRadius * cos(Math.toRadians(angle))).toFloat()
+        val y = center.y + (textRadius * sin(Math.toRadians(angle))).toFloat()
+
+        val textLayoutResult = textMeasurer.measure(
+            text = genreName, // Hiển thị trực tiếp String
+            style = TextStyle(color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        )
+
+        val textX = x - textLayoutResult.size.width / 2
+        val textY = y - textLayoutResult.size.height / 2
+
+        drawText(
+            textLayoutResult = textLayoutResult,
+            topLeft = Offset(textX, textY)
+        )
+    }
+}
+
+// ===============================================
+// 4. PREVIEW & SCREEN
+// ===============================================
+
 @Composable
 fun MusicDNASection() {
-    // Tính toán dữ liệu DNA
     val dnaData = remember { calculateMusicDNA(dummyListeningHistory, dummyMusicList) }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -98,137 +209,15 @@ fun MusicDNASection() {
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Hiển thị biểu đồ thật
             RadarChart(
                 dnaData = dnaData,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f) // Giữ cho biểu đồ luôn là hình vuông
+                    .aspectRatio(1f)
             )
         }
     }
 }
-
-
-// ===============================================
-// 4. BIỂU ĐỒ RADAR CHART
-// ===============================================
-@OptIn(ExperimentalTextApi::class)
-@Composable
-fun RadarChart(
-    dnaData: Map<MusicGenre, Float>,
-    modifier: Modifier = Modifier
-) {
-    // Các thể loại sẽ hiển thị trên biểu đồ, theo thứ tự mong muốn
-    val genres = listOf(MusicGenre.POP, MusicGenre.ROCK, MusicGenre.EDM, MusicGenre.HIP_HOP, MusicGenre.JAZZ, MusicGenre.CLASSICAL)
-    val textMeasurer = rememberTextMeasurer()
-
-    Canvas(modifier = modifier) {
-        val centerX = size.width / 2
-        val centerY = size.height / 2
-        val radius = size.minDimension / 2 * 0.8f // Bán kính của vòng ngoài cùng
-        val angleBetweenAxes = 360f / genres.size
-
-        // Vẽ các đường lưới (grid lines) và trục (axes)
-        drawGridAndAxes(genres.size, radius, angleBetweenAxes, center)
-
-        // Vẽ vùng dữ liệu DNA
-        val dnaPath = Path()
-        genres.forEachIndexed { index, genre ->
-            val value = dnaData[genre] ?: 0f // Lấy giá trị, mặc định là 0 nếu không có
-            val angle = (angleBetweenAxes * index - 90).toDouble() // -90 độ để Pop ở trên cùng
-            val pointRadius = radius * (value / 100f)
-            val x = centerX + (pointRadius * cos(Math.toRadians(angle))).toFloat()
-            val y = centerY + (pointRadius * sin(Math.toRadians(angle))).toFloat()
-
-            if (index == 0) {
-                dnaPath.moveTo(x, y)
-            } else {
-                dnaPath.lineTo(x, y)
-            }
-        }
-        dnaPath.close()
-
-        // Tô màu vùng dữ liệu
-        drawPath(dnaPath, color = Color(0xFF8B1FA0).copy(alpha = 0.7f), style = Fill)
-        // Vẽ đường viền cho vùng dữ liệu
-        drawPath(dnaPath, color = Color(0xFFB26CFF), style = Stroke(width = 3.dp.toPx()))
-
-
-        // Vẽ nhãn (labels) cho các thể loại
-        drawLabels(genres, radius, angleBetweenAxes, center, textMeasurer)
-    }
-}
-
-private fun DrawScope.drawGridAndAxes(
-    sides: Int,
-    radius: Float,
-    angleBetween: Float,
-    center: Offset
-) {
-    val gridLevels = 4
-    val gridColor = Color.Gray.copy(alpha = 0.5f)
-
-    // Vẽ các đường lưới đa giác đồng tâm
-    (1..gridLevels).forEach { level ->
-        val levelRadius = radius * level / gridLevels
-        val path = Path()
-        (0 until sides).forEach { i ->
-            val angle = (angleBetween * i - 90).toDouble()
-            val x = center.x + (levelRadius * cos(Math.toRadians(angle))).toFloat()
-            val y = center.y + (levelRadius * sin(Math.toRadians(angle))).toFloat()
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        path.close()
-        drawPath(path, color = gridColor, style = Stroke(width = 1.dp.toPx()))
-    }
-
-    // Vẽ các đường trục
-    (0 until sides).forEach { i ->
-        val angle = (angleBetween * i - 90).toDouble()
-        val x = center.x + (radius * cos(Math.toRadians(angle))).toFloat()
-        val y = center.y + (radius * sin(Math.toRadians(angle))).toFloat()
-        drawLine(
-            color = gridColor,
-            start = center,
-            end = Offset(x, y),
-            strokeWidth = 1.dp.toPx(),
-            cap = StrokeCap.Round
-        )
-    }
-}
-
-@OptIn(ExperimentalTextApi::class)
-private fun DrawScope.drawLabels(
-    genres: List<MusicGenre>,
-    radius: Float,
-    angleBetween: Float,
-    center: Offset,
-    textMeasurer: TextMeasurer
-) {
-    val labelOffset = 1.2f // Khoảng cách từ vòng ngoài cùng đến text
-    genres.forEachIndexed { i, genre ->
-        val angle = (angleBetween * i - 90).toDouble()
-        val textRadius = radius * labelOffset
-        val x = center.x + (textRadius * cos(Math.toRadians(angle))).toFloat()
-        val y = center.y + (textRadius * sin(Math.toRadians(angle))).toFloat()
-
-        val textLayoutResult = textMeasurer.measure(
-            text = genre.name,
-            style = TextStyle(color = Color.White, fontSize = 12.sp)
-        )
-
-        // Căn chỉnh text để nó không bị lệch
-        val textX = x - textLayoutResult.size.width / 2
-        val textY = y - textLayoutResult.size.height / 2
-
-        drawText(
-            textLayoutResult = textLayoutResult,
-            topLeft = Offset(textX, textY)
-        )
-    }
-}
-
 
 @Preview(showBackground = true, backgroundColor = 0xFF0A0A0A)
 @Composable

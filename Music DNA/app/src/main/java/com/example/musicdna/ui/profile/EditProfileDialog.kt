@@ -26,7 +26,7 @@ fun EditProfileDialog(
     onSave: (newName: String, newEmail: String, newPassword: String?) -> Unit
 ) {
     // Trạng thái cho các trường thông tin cơ bản
-    var tempName by remember { mutableStateOf(user.name) }
+    var tempName by remember { mutableStateOf(user.displayName) }
     var tempEmail by remember { mutableStateOf(user.email) }
 
     // Trạng thái cho việc thay đổi mật khẩu

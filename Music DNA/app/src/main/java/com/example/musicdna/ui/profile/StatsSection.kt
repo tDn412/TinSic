@@ -17,42 +17,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.musicdna.model.ListeningHistory
+import com.example.musicdna.model.HistoryItem
+import com.example.musicdna.model.User // User data class được import
 import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
 fun StatsSection(
-    // 1. Nhận vào danh sách lịch sử nghe nhạc
-    listeningHistory: List<ListeningHistory>
+    // 1. SỬA LỖI: Nhận vào đối tượng User hiện tại
+    user: User,
+    listeningHistory: List<HistoryItem>
 ) {
-    // 2. Tính toán số lượng bài hát yêu thích từ dữ liệu được truyền vào
-    val songsLikedCount = remember(listeningHistory) {
-        listeningHistory.count { it.isFavourite }
+    // Tính toán tổng số bài hát đã nghe (đã đúng)
+    val totalSongsPlayed = remember(listeningHistory) {
+        listeningHistory.size
     }
 
-    // 3. Định dạng số để có dấu phẩy (ví dụ: 1,247), giúp UI đẹp hơn
-    val formattedSongsLiked = remember(songsLikedCount) {
-        NumberFormat.getNumberInstance(Locale.US).format(songsLikedCount)
+    // 2. SỬA LỖI: Sử dụng đối tượng 'user' để lấy số lượng bài hát đã thích
+    val formattedSongsLiked = remember(user.likedSongs) {
+        NumberFormat.getNumberInstance(Locale.US).format(user.likedSongs.size)
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        // Dùng SpaceAround để khoảng cách giữa các card đều nhau và đẹp hơn
         horizontalArrangement = Arrangement.SpaceAround
     ) {
-        // 4. Sử dụng giá trị đã tính toán thay vì hardcode
         StatCard(
+            // Sử dụng giá trị đã tính toán
             value = formattedSongsLiked,
             label = "Songs Liked",
             color = Color(0xFF8B1FA0),
             modifier = Modifier.weight(1f)
         )
         StatCard(
-            value = "89", // Giữ nguyên giá trị giả lập cho "Parties Joined"
-            label = "Parties Joined",
+            // Sử dụng totalSongsPlayed cho "Total Played"
+            value = NumberFormat.getNumberInstance(Locale.US).format(totalSongsPlayed),
+            label = "Total Played",
             color = Color(0xFF0D47A1),
             modifier = Modifier.weight(1f)
         )
@@ -61,7 +63,6 @@ fun StatsSection(
 
 @Composable
 fun RowScope.StatCard(value: String, label: String, color: Color, modifier: Modifier = Modifier) {
-    // Cấu trúc của StatCard không thay đổi
     Column(
         modifier = modifier
             .padding(8.dp)

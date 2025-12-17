@@ -1,5 +1,6 @@
 package com.example.musicdna.ui.profile
 
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,6 +29,11 @@ import com.example.musicdna.data.dummyListeningHistory
 import com.example.musicdna.data.dummyMusicList
 import com.example.musicdna.model.MusicDnaProfile
 import com.example.musicdna.model.User
+import com.example.musicdna.utils.captureComposableToBitmap
+import com.example.musicdna.utils.shareBitmap
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.IconButton
 
 // Enum để quản lý các view một cách an toàn và rõ ràng
 private enum class DnaView { RADAR, ARTISTS, COUNTRIES }
@@ -36,11 +44,14 @@ fun ProfileScreen() {
     var user by remember {
         mutableStateOf(
             User(
-                userId = "uid123",
-                name = "Alex Johnson",
-                email = "alex.j@example.com",
-                password = "password123",
-                avatarUrl = null
+                uid = "uid123",
+                email = "nhudinhtu1@gmail.com",
+                displayName = "Alex Johnson",
+                photoUrl = null,
+                favoriteGenres = emptyList(),
+                hasCompletedOnboarding = true,
+                likedSongs = dummyMusicList.map { it.id },
+                dislikedSongs = emptyList()
             )
         )
     }
@@ -60,10 +71,10 @@ fun ProfileScreen() {
         HeaderSection(user = user, onEditProfileClick = { showEditDialog = true })
         Spacer(modifier = Modifier.height(16.dp))
 
-        StatsSection(listeningHistory = dummyListeningHistory)
+        StatsSection(user, listeningHistory = dummyListeningHistory)
         Spacer(modifier = Modifier.height(24.dp))
 
-        MusicDNASection(dnaProfile = dnaProfile)
+        MusicDNASection(dnaProfile = dnaProfile, user)
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
@@ -75,7 +86,7 @@ fun ProfileScreen() {
             user = user,
             onDismiss = { showEditDialog = false },
             onSave = { newName, newEmail, newPassword ->
-                val updatedUser = user.copy(name = newName, email = newEmail)
+                val updatedUser = user.copy(displayName = newName, email = newEmail)
                 if (newPassword != null) {
                     user = updatedUser.copy(password = newPassword)
                 } else {
@@ -92,8 +103,35 @@ fun ProfileScreen() {
  * •Giờ đây nó nhận toàn bộ dnaProfile và tự quản lý việc hiển thị các view khác nhau.
  */
 @Composable
-fun MusicDNASection(dnaProfile: MusicDnaProfile) {
+fun MusicDNASection(dnaProfile: MusicDnaProfile, user: User) {
     var currentView by remember { mutableStateOf(DnaView.RADAR) }
+
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val compositionContext = rememberCompositionContext()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Hàm xử lý việc chụp và chia sẻ
+    fun handleShare() {
+        coroutineScope.launch {
+            try {
+                // Chuyển đổi dp sang pixel
+                val widthPx = with(density) { 400.dp.toPx().toInt() }
+                val heightPx = with(density) { 700.dp.toPx().toInt() }
+
+                // Chụp Composable thành Bitmap (nay là suspend function)
+                val bitmap = captureComposableToBitmap(context, widthPx, heightPx, compositionContext) {
+                    SharableDnaImage(dnaProfile = dnaProfile, user = user)
+                }
+
+                // Chia sẻ bitmap vừa tạo
+                shareBitmap(context, bitmap)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Lỗi khi chia sẻ: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Row(
@@ -107,6 +145,11 @@ fun MusicDNASection(dnaProfile: MusicDnaProfile) {
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
+
+            IconButton(onClick = { handleShare() }) {
+                Icon(Icons.Default.Share, "Share DNA", tint = Color.White)
+            }
+
             DnaViewSwitcher(
                 selectedView = currentView,
                 onViewSelected = { newView -> currentView = newView }
@@ -193,7 +236,7 @@ private fun getFlagEmoji(countryCode: String): String {
  * •PHIÊN BẢN HOÀN CHỈNH VÀ ĐÃ SỬA LỖI.
  */
 @Composable
-private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
+fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
     // Xác định xem đây là danh sách nghệ sĩ hay quốc gia
     val isArtistList = title.contains("Artists")
 
@@ -262,44 +305,6 @@ private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
                 }
             }
         }
-    }
-}
-
-// Đặt ở đâu đó trong file ProfileScreen.kt
-@Composable
-fun SharableDnaImage(dnaProfile: MusicDnaProfile, user: User) {
-    Column(
-        modifier = Modifier
-            .size(width = 400.dp, height = 700.dp) // Kích thước cố định
-            .background(Color(0xFF121212)) // Nền tối
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // 1. Header
-        Text("Music DNA của ${user.name}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 2. Biểu đồ Radar
-        RadarChart(
-            dnaData = dnaProfile.genreDistribution,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 3. Top Lists
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                TopItemsList(title = "Top Artists", items = dnaProfile.topArtists)
-            }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                TopItemsList(title = "Top Markets", items = dnaProfile.topCountries)
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f)) // Đẩy footer xuống dưới
-
-        // 4. Footer
-        Text("Tạo bởi Music DNA App", color = Color.Gray, fontSize = 12.sp)
     }
 }
 

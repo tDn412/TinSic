@@ -1,51 +1,59 @@
 package com.example.musicdna.analytics
 
-import com.example.musicdna.model.ListeningHistory
+import com.example.musicdna.model.HistoryItem
 import com.example.musicdna.model.Music
 import com.example.musicdna.model.MusicDnaProfile
-import com.example.musicdna.model.MusicGenre // <-- ĐÃ SỬA LỖI
 
-// object AnalyticsEngine: Singleton object để chứa logic phân tích
-object AnalyticsEngine { // <-- ĐÃ SỬA LỖI
+object AnalyticsEngine {
 
     fun calculateDnaProfile(
-        history: List<ListeningHistory>,
+        history: List<HistoryItem>,
         musicList: List<Music>
     ): MusicDnaProfile {
 
-        val musicMap = musicList.associateBy { it.musicId }
+        // Tạo Map để tra cứu nhanh bài hát theo ID (Music.id)
+        val musicMap = musicList.associateBy { it.id }
 
-        // Lọc ra các bài hát yêu thích để phân tích
-        val favoriteMusic = history
-            .filter { it.isFavourite }
-            .mapNotNull { musicMap[it.musicId] }
+        // Lấy danh sách các đối tượng Music tương ứng với lịch sử nghe
+        // Lưu ý: Vì HistoryItem mới không có 'isFavourite', ta tính toán dựa trên toàn bộ lịch sử nghe.
+        val listenedMusic = history
+            .mapNotNull { historyItem ->
+                musicMap[historyItem.songId]
+            }
+
+        if (listenedMusic.isEmpty()) {
+            return MusicDnaProfile(emptyMap(), emptyList(), emptyList())
+        }
 
         // a. Tính Top 5 Nghệ sĩ
-        val topArtists = favoriteMusic
+        val topArtists = listenedMusic
             .groupingBy { it.artist }
-            .eachCount() // Đếm số bài hát của mỗi nghệ sĩ
+            .eachCount() // Đếm số lần xuất hiện của nghệ sĩ trong lịch sử
             .toList()
-            .sortedByDescending { it.second } // Sắp xếp giảm dần theo số lượng
-            .take(5) // Lấy 5 người đứng đầu
+            .sortedByDescending { it.second } // Sắp xếp giảm dần
+            .take(5) // Lấy 5 người đầu tiên
 
-        // b. Tính Top 5 Quốc gia
-        val topCountries = favoriteMusic
+        // b. Tính Top 5 Quốc gia (Thị trường âm nhạc)
+        val topCountries = listenedMusic
             .groupingBy { it.country }
             .eachCount()
             .toList()
             .sortedByDescending { it.second }
             .take(5)
 
-        // Tính toán phân bổ thể loại (giữ nguyên logic cũ)
-        val genreCounts = favoriteMusic
-            .groupingBy { it.genre }
+        // c. Tính toán phân bổ thể loại (Dựa trên String)
+        val genreCounts = listenedMusic
+            .groupingBy { it.genre } // it.genre bây giờ là String (ví dụ: "POP")
             .eachCount()
+
+        // Tìm giá trị lớn nhất để chuẩn hóa về thang 100 (cho biểu đồ Radar)
         val maxCount = genreCounts.maxOfOrNull { it.value }?.toFloat() ?: 1f
+
         val genreDistribution = genreCounts.mapValues { (_, count) ->
             (count / maxCount) * 100f
         }
 
-        // Trả về đối tượng tổng hợp đã được rút gọn
+        // Trả về kết quả
         return MusicDnaProfile(
             genreDistribution = genreDistribution,
             topArtists = topArtists,

@@ -51,7 +51,7 @@ fun HeaderSection(
             contentAlignment = Alignment.Center
         ) {
             // Kiểm tra nếu avatarUrl là null thì dùng icon mặc định
-            if (user.avatarUrl == null) {
+            if (user.photoUrl == null) {
                 Icon(
                     imageVector = Icons.Default.Person, // Icon mặc định
                     contentDescription = "Default Avatar",
@@ -67,9 +67,9 @@ fun HeaderSection(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Hiển thị tên từ đối tượng user
-        Text(user.name, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(user.displayName, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         // Bạn có thể tạo username từ email hoặc thêm một trường mới trong User model
-        Text("@${user.name.lowercase().replace(" ", "")}", color = Color.Gray, fontSize = 14.sp)
+        Text("@${user.displayName.lowercase().replace(" ", "")}", color = Color.Gray, fontSize = 14.sp)
 
         Spacer(modifier = Modifier.height(12.dp))
         Button(

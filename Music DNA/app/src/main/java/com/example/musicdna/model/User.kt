@@ -1,12 +1,14 @@
 package com.example.musicdna.model
 
-import java.time.LocalDateTime
-
 data class User(
-    val userId: String,
-    var name: String,
-    var email: String,
-    var password: String,
-    val avatarUrl: String? = null, // Dùng String để lưu đường dẫn
-    val accountCreationDate: LocalDateTime = LocalDateTime.now()
+    val uid: String = "",
+    val email: String = "",
+    val password: String = "",
+    val displayName: String = "",
+    val photoUrl: String ?= null,
+    val favoriteGenres: List<String> = emptyList(),
+    val hasCompletedOnboarding: Boolean = false,
+    val likedSongs: List<String> = emptyList(), // List of Song IDs
+    val dislikedSongs: List<String> = emptyList(), // List of Song IDs
+    val achievements: Map<Achievement, UserAchievementProgress> = emptyMap() // e.g., "dom_con": true
 )
