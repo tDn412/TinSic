@@ -6,6 +6,14 @@
 - **Môn học:** Phát triển ứng dụng di động (INT3120 1)
 - **Giảng viên hướng dẫn:** Lê Khánh Trình
 
+| Họ và tên | Mã sinh viên | Email | Github |
+| :--- | :--- | :--- | :--- |
+| **Nhữ Đình Tú** | 23021703 | nhudinhtu1@gmail.com | [@tDn412](https://github.com/tDn412) |
+| **Nguyễn Anh Tuấn** | 23021707 | nguyenanhtuan070305@gmail.com | [@natuan05](https://github.com/natuan05) |
+| **Lê Duy Vũ** | 23021751 | djanh123456@gmail.com | [@notvux00](https://github.com/notvux00) |
+| **Lê Ngọc Quyết** | 23021679 | lengocquyet120305@gmail.com | [@LeeNgocQuyet](https://github.com/LeeNgocQuyet) |
+| **Lê Nhữ Quang** | 23021671 | lvs.hunghoa@gmail.com | [@qu4ll12](https://github.com/qu4ll12) |
+
 ---
 
 ### 1. Giới thiệu tổng quan
