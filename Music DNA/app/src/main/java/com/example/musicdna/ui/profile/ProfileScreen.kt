@@ -9,13 +9,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,6 +32,8 @@ import com.example.musicdna.data.dummyListeningHistory
 import com.example.musicdna.data.dummyMusicList
 import com.example.musicdna.model.MusicDnaProfile
 import com.example.musicdna.model.User
+import com.example.musicdna.utils.captureComposableToBitmap
+import com.example.musicdna.utils.shareBitmap
 
 // Enum để quản lý các view một cách an toàn và rõ ràng
 private enum class DnaView { RADAR, ARTISTS, COUNTRIES }
@@ -63,7 +71,8 @@ fun ProfileScreen() {
         StatsSection(listeningHistory = dummyListeningHistory)
         Spacer(modifier = Modifier.height(24.dp))
 
-        MusicDNASection(dnaProfile = dnaProfile)
+        // SỬA LỖI: Truyền tham số 'user' còn thiếu
+        MusicDNASection(dnaProfile = dnaProfile, user = user)
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
@@ -92,21 +101,43 @@ fun ProfileScreen() {
  * •Giờ đây nó nhận toàn bộ dnaProfile và tự quản lý việc hiển thị các view khác nhau.
  */
 @Composable
-fun MusicDNASection(dnaProfile: MusicDnaProfile) {
+fun MusicDNASection(dnaProfile: MusicDnaProfile, user: User) {
     var currentView by remember { mutableStateOf(DnaView.RADAR) }
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    // Hàm xử lý việc chụp và chia sẻ
+    fun handleShare() {
+        // Chuyển đổi dp sang pixel
+        val widthPx = with(density) { 400.dp.toPx().toInt() }
+        val heightPx = with(density) { 700.dp.toPx().toInt() }
+
+        // Chụp Composable thành Bitmap
+        val bitmap = captureComposableToBitmap(context, widthPx, heightPx) {
+            SharableDnaImage(dnaProfile = dnaProfile, user = user)
+        }
+
+        // Chia sẻ bitmap vừa tạo
+        shareBitmap(context, bitmap)
+    }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 "Music DNA",
                 color = Color.White,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
+            // Nút Share mới
+            IconButton(onClick = { handleShare() }) {
+                Icon(Icons.Default.Share, "Share DNA", tint = Color.White)
+            }
+            // Switcher
             DnaViewSwitcher(
                 selectedView = currentView,
                 onViewSelected = { newView -> currentView = newView }
@@ -193,7 +224,7 @@ private fun getFlagEmoji(countryCode: String): String {
  * •PHIÊN BẢN HOÀN CHỈNH VÀ ĐÃ SỬA LỖI.
  */
 @Composable
-private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
+fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
     // Xác định xem đây là danh sách nghệ sĩ hay quốc gia
     val isArtistList = title.contains("Artists")
 
@@ -249,8 +280,6 @@ private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Spacer(modifier = Modifier.weight(1f)) // Đã di chuyển weight(1f) vào Text trên để đảm bảo nó không đẩy Text sang phải
-
                         // Số lượng
                         Text(
                             text = "${item.second} songs",
@@ -265,46 +294,10 @@ private fun TopItemsList(title: String, items: List<Pair<String, Int>>) {
     }
 }
 
-// Đặt ở đâu đó trong file ProfileScreen.kt
-@Composable
-fun SharableDnaImage(dnaProfile: MusicDnaProfile, user: User) {
-    Column(
-        modifier = Modifier
-            .size(width = 400.dp, height = 700.dp) // Kích thước cố định
-            .background(Color(0xFF121212)) // Nền tối
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // 1. Header
-        Text("Music DNA của ${user.name}", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 2. Biểu đồ Radar
-        RadarChart(
-            dnaData = dnaProfile.genreDistribution,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 3. Top Lists
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                TopItemsList(title = "Top Artists", items = dnaProfile.topArtists)
-            }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                TopItemsList(title = "Top Markets", items = dnaProfile.topCountries)
-            }
-        }
-
-        Spacer(modifier = Modifier.weight(1f)) // Đẩy footer xuống dưới
-
-        // 4. Footer
-        Text("Tạo bởi Music DNA App", color = Color.Gray, fontSize = 12.sp)
-    }
-}
 
 @Preview(showBackground = true, name = "Profile Screen Preview", backgroundColor = 0xFF0A0A0A)
 @Composable
 fun ProfileScreenPreview() {
     ProfileScreen()
 }
+
