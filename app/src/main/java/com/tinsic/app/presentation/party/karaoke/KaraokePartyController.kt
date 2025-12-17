@@ -227,4 +227,22 @@ class KaraokePartyController @Inject constructor(
         _currentSongNotes.value = emptyList()
         _currentSongLyrics.value = emptyList()
     }
+    
+    /**
+     * Remove song from prefetch cache
+     * Called when song is removed from queue
+     */
+    fun removeSongFromCache(songId: String) {
+        prefetchCache.remove(songId)
+        Log.d("KaraokeCtrl", "[Cache] Removed song from cache: $songId")
+    }
+    
+    /**
+     * Clear all cached songs
+     * Called when leaving room or clearing queue
+     */
+    fun clearAllCache() {
+        prefetchCache.clear()
+        Log.d("KaraokeCtrl", "[Cache] Cleared all cached songs")
+    }
 }

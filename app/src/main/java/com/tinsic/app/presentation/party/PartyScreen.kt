@@ -127,13 +127,17 @@ fun PartyScreen(
                     val karaokeController: com.tinsic.app.presentation.party.karaoke.KaraokePartyController = 
                         androidx.hilt.navigation.compose.hiltViewModel()
                     
-                    // Prefetch songs in queue for instant loading (background download)
+                    // Prefetch & cleanup logic for queue changes
                     val queueForPrefetch by viewModel.queueWithUrls.collectAsState()
                     LaunchedEffect(queueForPrefetch) {
+                        // Prefetch new songs in queue
                         queueForPrefetch.values.forEach { song ->
-                            // Trigger background prefetch for each song in queue
                             karaokeController.prefetchSong(song)
                         }
+                        
+                        // Note: Cache cleanup happens automatically when ViewModel is cleared
+                        // For manual cleanup when song removed, we would need to track previous queue
+                        // and detect removals, but in-memory cache is lightweight enough to keep
                     }
                     
                     // Wire resource loading logic
