@@ -447,8 +447,13 @@ fun ActivePartyRoom(
             val currentSong = queueWithUrls.values.firstOrNull()
             val audioUrl = currentSong?.audioUrl ?: ""
             
-            android.util.Log.d("KaraokeRoom", "[PLAYING] State entered. Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
-            android.util.Log.d("KaraokeRoom", "[PLAYING] IsHost: $isHost, AudioURL: $audioUrl")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] ========================================")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] CurrentUser.id: '${currentUser.id}'")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] HostId: '$hostId'")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] IsHost: $isHost (${if(isHost) "WILL PLAY AUDIO" else "NO AUDIO"})")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] AudioURL: ${audioUrl.take(100)}")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] ========================================")
             
             // Wire data to KaraokeViewModel when data is ready
             LaunchedEffect(songNotes, songLyrics, audioUrl, isHost) {

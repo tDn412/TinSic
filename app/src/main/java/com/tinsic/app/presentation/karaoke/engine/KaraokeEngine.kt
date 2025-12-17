@@ -76,50 +76,52 @@ class KaraokeEngine @Inject constructor(
         this.latencyOffsetMs = config.initialLatencyOffsetMs
         isRunning = true
 
-        // 1. Init Media Player (HOST ONLY - Zero Footprint Streaming)
-        if (config.isPlaybackEnabled && config.audioUrl.isNotEmpty()) {
-            android.util.Log.d("KaraokeEngine", "[HOST] Starting audio stream from URL: ${config.audioUrl}")
-            try {
-                mediaPlayer = MediaPlayer().apply {
-                    setDataSource(config.audioUrl)  // Stream from URL (no download!)
-                    setVolume(1.0f, 1.0f)
-                    
-                    // Use prepareAsync to avoid blocking UI thread
-                    setOnPreparedListener { player ->
-                        android.util.Log.d("KaraokeEngine", "[HOST] Stream prepared, starting playback...")
-                        player.start()
-                    }
-                    
-                    setOnErrorListener { _, what, extra ->
-                        android.util.Log.e("KaraokeEngine", "[HOST] MediaPlayer error: what=$what, extra=$extra")
-                        true
-                    }
-                    
-                    prepareAsync()
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("KaraokeEngine", "[HOST] Failed to init streaming: ${e.message}", e)
-                mediaPlayer = null
-            }
-        } else if (!config.isPlaybackEnabled) {
-            android.util.Log.d("KaraokeEngine", "[GUEST] Playback disabled, no audio will be played")
-        }
-
-        // 2. Init AudioRecord (ALWAYS for pitch detection & scoring)
-        if (config.isRecordingEnabled) {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                BUFFER_SIZE
-            )
-            audioRecord?.startRecording()
-            android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
-        }
-
-        // 3. Start Processing Loop
+        // Start processing job that will initialize everything
         processingJob = CoroutineScope(Dispatchers.IO).launch {
+            // 1. Init Media Player (HOST ONLY - Zero Footprint Streaming)
+            if (config.isPlaybackEnabled && config.audioUrl.isNotEmpty()) {
+                android.util.Log.d("KaraokeEngine", "[HOST] Starting audio stream from URL: ${config.audioUrl}")
+                
+                try {
+                    mediaPlayer = MediaPlayer().apply {
+                        setDataSource(config.audioUrl)  // Stream from URL (no download!)
+                        setVolume(1.0f, 1.0f)
+                        
+                        setOnErrorListener { _, what, extra ->
+                            android.util.Log.e("KaraokeEngine", "[HOST] MediaPlayer error: what=$what, extra=$extra")
+                            true
+                        }
+                        
+                        // Use synchronous prepare() in IO thread (not UI blocking!)
+                        android.util.Log.d("KaraokeEngine", "[HOST] Preparing stream (this may take a moment)...")
+                        prepare()  // Blocking call, but we're in IO thread - WAIT FOR THIS!
+                        android.util.Log.d("KaraokeEngine", "[HOST] Stream prepared! Starting playback...")
+                        start()
+                        android.util.Log.d("KaraokeEngine", "[HOST] Playback started successfully")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("KaraokeEngine", "[HOST] Failed to init streaming: ${e.message}", e)
+                    mediaPlayer = null
+                }
+            } else if (!config.isPlaybackEnabled) {
+                android.util.Log.d("KaraokeEngine", "[GUEST] Playback disabled, no audio will be played")
+            }
+
+            // 2. Init AudioRecord (ALWAYS for pitch detection & scoring)
+            if (config.isRecordingEnabled) {
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    BUFFER_SIZE
+                )
+                audioRecord?.startRecording()
+                android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
+            }
+
+            // 3. Start Processing Loop (MediaPlayer is ready now!)
+            android.util.Log.d("KaraokeEngine", "Starting processing loop...")
             processingLoop()
         }
     }
