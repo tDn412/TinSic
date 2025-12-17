@@ -20,8 +20,9 @@ import java.util.Arrays
 import javax.inject.Inject
 
 data class KaraokeConfig(
-    val isPlaybackEnabled: Boolean = true,
-    val isRecordingEnabled: Boolean = true,
+    val audioUrl: String = "",                    // NEW: URL for streaming audio
+    val isPlaybackEnabled: Boolean = true,        // Host-only flag
+    val isRecordingEnabled: Boolean = true,       // Always true for scoring
     val initialLatencyOffsetMs: Int = 0
 )
 
@@ -75,26 +76,36 @@ class KaraokeEngine @Inject constructor(
         this.latencyOffsetMs = config.initialLatencyOffsetMs
         isRunning = true
 
-        // 1. Init Media Player (if enabled)
-        if (config.isPlaybackEnabled) {
-            // Note: R.raw.beat_phia_sau_mot_co_gai needs to exist or handle error
-            // Using try-catch to avoid crash if resource missing
+        // 1. Init Media Player (HOST ONLY - Zero Footprint Streaming)
+        if (config.isPlaybackEnabled && config.audioUrl.isNotEmpty()) {
+            android.util.Log.d("KaraokeEngine", "[HOST] Starting audio stream from URL: ${config.audioUrl}")
             try {
-               // Placeholder for resource ID, user must provide the file name or ID mapped
-               // For now assume the user will copy the MP3 to res/raw
-               val resId = context.resources.getIdentifier("beat_phia_sau_mot_co_gai", "raw", context.packageName)
-               if(resId != 0) {
-                    mediaPlayer = MediaPlayer.create(context, resId).apply {
-                        setVolume(1.0f, 1.0f)
-                        start()
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(config.audioUrl)  // Stream from URL (no download!)
+                    setVolume(1.0f, 1.0f)
+                    
+                    // Use prepareAsync to avoid blocking UI thread
+                    setOnPreparedListener { player ->
+                        android.util.Log.d("KaraokeEngine", "[HOST] Stream prepared, starting playback...")
+                        player.start()
                     }
-               }
+                    
+                    setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("KaraokeEngine", "[HOST] MediaPlayer error: what=$what, extra=$extra")
+                        true
+                    }
+                    
+                    prepareAsync()
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("KaraokeEngine", "[HOST] Failed to init streaming: ${e.message}", e)
+                mediaPlayer = null
             }
+        } else if (!config.isPlaybackEnabled) {
+            android.util.Log.d("KaraokeEngine", "[GUEST] Playback disabled, no audio will be played")
         }
 
-        // 2. Init AudioRecord (if enabled)
+        // 2. Init AudioRecord (ALWAYS for pitch detection & scoring)
         if (config.isRecordingEnabled) {
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
@@ -104,6 +115,7 @@ class KaraokeEngine @Inject constructor(
                 BUFFER_SIZE
             )
             audioRecord?.startRecording()
+            android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
         }
 
         // 3. Start Processing Loop

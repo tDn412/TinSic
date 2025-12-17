@@ -436,15 +436,32 @@ fun ActivePartyRoom(
             val songNotes by karaokeController.currentSongNotes.collectAsState()  // From KaraokeController
             val songLyrics by karaokeController.currentSongLyrics.collectAsState()  // From KaraokeController
             
+            // Get host ID and queue for audio URL
+            val hostId by partyViewModel.hostId.collectAsState()
+            val queueWithUrls by partyViewModel.queueWithUrls.collectAsState()
+            
+            // Determine if current user is host
+            val isHost = currentUser.id == hostId
+            
+            // Get audio URL from first song in queue (currently playing)
+            val currentSong = queueWithUrls.values.firstOrNull()
+            val audioUrl = currentSong?.audioUrl ?: ""
+            
             android.util.Log.d("KaraokeRoom", "[PLAYING] State entered. Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] IsHost: $isHost, AudioURL: $audioUrl")
             
             // Wire data to KaraokeViewModel when data is ready
-            LaunchedEffect(songNotes, songLyrics) {
-                if (songNotes.isNotEmpty() && songLyrics.isNotEmpty()) {
-                    android.util.Log.d("KaraokeRoom", "[DataWiring] ✅ Starting karaoke with ${songNotes.size} notes, ${songLyrics.size} lyrics")
-                    karaokeViewModel.startSinging(songNotes, songLyrics)
+            LaunchedEffect(songNotes, songLyrics, audioUrl, isHost) {
+                if (songNotes.isNotEmpty() && songLyrics.isNotEmpty() && audioUrl.isNotEmpty()) {
+                    android.util.Log.d("KaraokeRoom", "[DataWiring] ✅ Starting karaoke - Host: $isHost")
+                    karaokeViewModel.startSinging(
+                        notes = songNotes,
+                        lyrics = songLyrics,
+                        audioUrl = audioUrl,
+                        isHost = isHost
+                    )
                 } else {
-                    android.util.Log.w("KaraokeRoom", "[DataWiring] ⚠️ Waiting for data... Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
+                    android.util.Log.w("KaraokeRoom", "[DataWiring] ⚠️ Waiting for data... Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}, AudioURL: ${audioUrl.take(50)}")
                 }
             }
             

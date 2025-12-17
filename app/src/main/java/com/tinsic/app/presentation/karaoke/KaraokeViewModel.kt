@@ -102,7 +102,12 @@ class KaraokeViewModel @Inject constructor(
         }
     }
 
-    fun startSinging(notes: List<SongNote>, lyrics: List<LyricLine>) {
+    fun startSinging(
+        notes: List<SongNote>, 
+        lyrics: List<LyricLine>,
+        audioUrl: String = "",           // NEW: Audio URL for streaming
+        isHost: Boolean = false          // NEW: Host-only playback flag
+    ) {
         _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
         viewModelScope.launch {
@@ -113,14 +118,23 @@ class KaraokeViewModel @Inject constructor(
                     isRecording = true,
                     isLoading = false,
                     currentScore = 0, 
-                    feedbackText = "Đang phát nhạc...",
+                    feedbackText = if (isHost) "Đang phát nhạc..." else "Sẵn sàng hát...",
                     songNotes = notes, 
                     lyrics = lyrics,
                     userPitchHistory = emptyList()
                 )
             }
 
-            karaokeEngine.startRecording(notes)
+            // Create config with host-only playback
+            val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
+                audioUrl = audioUrl,
+                isPlaybackEnabled = isHost,  // Only host plays audio
+                isRecordingEnabled = true,   // Everyone records for scoring
+                initialLatencyOffsetMs = _latencyOffset.value
+            )
+
+            karaokeEngine.startRecording(notes, config)
+            android.util.Log.d("KaraokeVM", "Started singing - Host: $isHost, AudioURL: $audioUrl")
         }
     }
 
