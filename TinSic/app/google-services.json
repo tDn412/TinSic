@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "879139710144",
+    "project_id": "tinsic",
+    "storage_bucket": "tinsic.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879139710144:android:8fa7391c7bd39a0bbc3925",
+        "android_client_info": {
+          "package_name": "com.tinsic.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBsSY29621dmZ72OI57ecYAjR3FWv25iQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
