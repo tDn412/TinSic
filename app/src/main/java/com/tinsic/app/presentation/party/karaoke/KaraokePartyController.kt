@@ -286,6 +286,14 @@ class KaraokePartyController @Inject constructor(
     }
     
     /**
+     * Check if song is already prefetched and ready
+     * Used to skip LOADING state if cache hit
+     */
+    fun isSongCached(songId: String): Boolean {
+        return prefetchCache.containsKey(songId)
+    }
+    
+    /**
      * Remove song from prefetch cache
      * Called when song is removed from queue
      */

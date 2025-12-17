@@ -166,7 +166,13 @@ class PartyViewModel @Inject constructor(
                             
                             if (timeLeft <= 0) {
                                 Log.d("PartyVM", "[Countdown] Finished! Transitioning to PLAYING...")
-                                partyRepository.updatePlaybackState(_roomId.value, "PLAYING", 0L)
+                                
+                                // CRITICAL: Use countdown end time (NOT new server time!)
+                                // This ensures perfect sync between countdown and playing
+                                val playingStartTime = _startTime.value
+                                Log.d("PartyVM", "[Countdown] Setting PLAYING startTime: $playingStartTime (countdown end)")
+                                
+                                partyRepository.updatePlaybackState(_roomId.value, "PLAYING", playingStartTime)
                                 break
                             }
                             

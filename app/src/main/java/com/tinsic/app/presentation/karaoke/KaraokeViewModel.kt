@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.tinsic.app.domain.karaoke.model.LyricLine
 import com.tinsic.app.domain.karaoke.model.SongNote
 import com.tinsic.app.presentation.karaoke.engine.KaraokeEngine
+import com.tinsic.app.presentation.karaoke.engine.KaraokeConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -103,41 +104,98 @@ class KaraokeViewModel @Inject constructor(
     }
 
     fun startSinging(
-        notes: List<SongNote>, 
-        lyrics: List<LyricLine>,
-        audioUrl: String = "",           // NEW: Audio URL for streaming
-        isHost: Boolean = false          // NEW: Host-only playback flag
-    ) {
-        _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
+    notes: List<SongNote>, 
+    lyrics: List<LyricLine>,
+    audioUrl: String = "",           // Fallback: Streaming URL
+    mp3FilePath: String? = null,     // Preferred: Local prefetched file
+    isHost: Boolean = false,         // Host-only playback flag
+    startTimeMs: Long = 0L           // Server start time for guest sync
+) {
+    _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
+    viewModelScope.launch {
+        pitchBuffer.clear()
+        
+        _uiState.update {
+            it.copy(
+                isRecording = true,
+                isLoading = false,
+                currentScore = 0, 
+                feedbackText = if (isHost) "Đang phát nhạc..." else "Sẵn sàng hát...",
+                songNotes = notes, 
+                lyrics = lyrics,
+                userPitchHistory = emptyList()
+            )
+        }
+
+        // Create config with prefetched file support
+        val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
+            audioUrl = audioUrl,
+            mp3FilePath = mp3FilePath,   // Local file (instant load if available!)
+            isPlaybackEnabled = isHost,  // Only host plays audio
+            isRecordingEnabled = true,   // Everyone records for scoring
+            startTimeMs = startTimeMs,   // Server time for guest sync
+            initialLatencyOffsetMs = _latencyOffset.value
+        )
+
+        karaokeEngine.startRecording(notes, config)
+        android.util.Log.d("KaraokeVM", "Started singing - Host: $isHost, MP3: ${if (mp3FilePath != null) "LOCAL ✅" else "Stream"}, StartTime: $startTimeMs")
+    }
+}
+
+    /**
+     * PHASE 1: Prepare everything (call during LOADING)
+     */
+    fun prepareSinging(
+        notes: List<SongNote>,
+        lyrics: List<LyricLine>,
+        audioUrl: String = "",
+        mp3FilePath: String? = null,
+        isHost: Boolean = false
+    ) {
         viewModelScope.launch {
-            pitchBuffer.clear()
+            _uiState.update {
+                it.copy(
+                    songNotes = notes,
+                    lyrics = lyrics
+                )
+            }
             
+            val config = KaraokeConfig(
+                audioUrl = audioUrl,
+                mp3FilePath = mp3FilePath,
+                isPlaybackEnabled = isHost,
+                isRecordingEnabled = true,
+                startTimeMs = 0L,
+                initialLatencyOffsetMs = _latencyOffset.value
+            )
+            
+            karaokeEngine.startRecording(notes, config)
+            android.util.Log.d("KaraokeVM", "Prepared - Host: $isHost, MP3: ${if (mp3FilePath != null) "LOCAL" else "Stream"}")
+        }
+    }
+
+    /**
+     * PHASE 2: Start playback (call when PLAYING)
+     */
+    fun startPlayback(startTimeMs: Long) {
+        viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isRecording = true,
                     isLoading = false,
-                    currentScore = 0, 
-                    feedbackText = if (isHost) "Đang phát nhạc..." else "Sẵn sàng hát...",
-                    songNotes = notes, 
-                    lyrics = lyrics,
+                    currentScore = 0,
+                    feedbackText = "Đang hát...",
                     userPitchHistory = emptyList()
                 )
             }
-
-            // Create config with host-only playback
-            val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
-                audioUrl = audioUrl,
-                isPlaybackEnabled = isHost,  // Only host plays audio
-                isRecordingEnabled = true,   // Everyone records for scoring
-                initialLatencyOffsetMs = _latencyOffset.value
-            )
-
-            karaokeEngine.startRecording(notes, config)
-            android.util.Log.d("KaraokeVM", "Started singing - Host: $isHost, AudioURL: $audioUrl")
+            
+            karaokeEngine.config = karaokeEngine.config.copy(startTimeMs = startTimeMs)
+            karaokeEngine.startPlayback()
+            
+            android.util.Log.d("KaraokeVM", "Playback started at $startTimeMs")
         }
     }
-
      fun stopSinging() {
         karaokeEngine.stopRecording()
         _uiState.update {
@@ -155,12 +213,12 @@ class KaraokeViewModel @Inject constructor(
     }
 
     fun increaseLatency() {
-        val newOffset = _latencyOffset.value + 50
+        val newOffset = _latencyOffset.value + 200
         setLatencyOffset(newOffset)
     }
 
     fun decreaseLatency() {
-        val newOffset = _latencyOffset.value - 50
+        val newOffset = _latencyOffset.value - 200
         setLatencyOffset(newOffset)
     }
 }

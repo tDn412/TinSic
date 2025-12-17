@@ -20,9 +20,11 @@ import java.util.Arrays
 import javax.inject.Inject
 
 data class KaraokeConfig(
-    val audioUrl: String = "",                    // NEW: URL for streaming audio
+    val audioUrl: String = "",                    // Fallback: URL for streaming audio
+    val mp3FilePath: String? = null,              // Preferred: Local file path (instant load!)
     val isPlaybackEnabled: Boolean = true,        // Host-only flag
     val isRecordingEnabled: Boolean = true,       // Always true for scoring
+    val startTimeMs: Long = 0L,                   // Server start time for guest sync
     val initialLatencyOffsetMs: Int = 0
 )
 
@@ -54,7 +56,7 @@ class KaraokeEngine @Inject constructor(
     private var processingJob: Job? = null
 
     private var currentSongNotes: List<SongNote> = emptyList()
-    private var config: KaraokeConfig = KaraokeConfig()
+    internal var config: KaraokeConfig = KaraokeConfig()
 
     // Latency Control
     private var latencyOffsetMs: Int = 0
@@ -78,13 +80,27 @@ class KaraokeEngine @Inject constructor(
 
         // Start processing job that will initialize everything
         processingJob = CoroutineScope(Dispatchers.IO).launch {
-            // 1. Init Media Player (HOST ONLY - Zero Footprint Streaming)
-            if (config.isPlaybackEnabled && config.audioUrl.isNotEmpty()) {
-                android.util.Log.d("KaraokeEngine", "[HOST] Starting audio stream from URL: ${config.audioUrl}")
+            // 1. Init Media Player (HOST ONLY)
+            if (config.isPlaybackEnabled) {
+                // Prefer local file (instant!), fallback to streaming
+                val useLocalFile = !config.mp3FilePath.isNullOrEmpty()
+                
+                if (useLocalFile) {
+                    android.util.Log.d("KaraokeEngine", "[HOST] Loading from PREFETCHED file: ${config.mp3FilePath}")
+                } else {
+                    android.util.Log.d("KaraokeEngine", "[HOST] Streaming from URL (no cache): ${config.audioUrl}")
+                }
                 
                 try {
                     mediaPlayer = MediaPlayer().apply {
-                        setDataSource(config.audioUrl)  // Stream from URL (no download!)
+                        if (useLocalFile) {
+                            // INSTANT LOAD from local file!
+                            setDataSource(config.mp3FilePath!!)
+                        } else {
+                            // FALLBACK: Stream from URL
+                            setDataSource(config.audioUrl)
+                        }
+                        
                         setVolume(1.0f, 1.0f)
                         
                         setOnErrorListener { _, what, extra ->
@@ -92,15 +108,16 @@ class KaraokeEngine @Inject constructor(
                             true
                         }
                         
-                        // Use synchronous prepare() in IO thread (not UI blocking!)
-                        android.util.Log.d("KaraokeEngine", "[HOST] Preparing stream (this may take a moment)...")
-                        prepare()  // Blocking call, but we're in IO thread - WAIT FOR THIS!
-                        android.util.Log.d("KaraokeEngine", "[HOST] Stream prepared! Starting playback...")
-                        start()
-                        android.util.Log.d("KaraokeEngine", "[HOST] Playback started successfully")
+                        // Synchronous prepare (blocking in IO thread)
+                        val prepareStartTime = System.currentTimeMillis()
+                        prepare()
+                        val prepareDelayMs = System.currentTimeMillis() - prepareStartTime
+                        
+                        android.util.Log.d("KaraokeEngine", "[HOST] ✅ PREPARED in ${prepareDelayMs}ms! ${if (useLocalFile) "INSTANT" else "Streaming"} - Ready to start!")
+                        // DO NOT start() - will be called separately in startPlayback()
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("KaraokeEngine", "[HOST] Failed to init streaming: ${e.message}", e)
+                    android.util.Log.e("KaraokeEngine", "[HOST] Failed to init audio: ${e.message}", e)
                     mediaPlayer = null
                 }
             } else if (!config.isPlaybackEnabled) {
@@ -123,6 +140,30 @@ class KaraokeEngine @Inject constructor(
             // 3. Start Processing Loop (MediaPlayer is ready now!)
             android.util.Log.d("KaraokeEngine", "Starting processing loop...")
             processingLoop()
+        }
+    }
+
+    /**
+     * PHASE 2: Start playback (call when PLAYING state begins)
+     * MediaPlayer must already be prepared by startRecording()!
+     */
+    fun startPlayback() {
+        if (!isRunning) {
+            android.util.Log.w("KaraokeEngine", "[HOST] Cannot start - engine not prepared!")
+            return
+        }
+        
+        try {
+            mediaPlayer?.let { player ->
+                if (!player.isPlaying) {
+                    player.start()
+                    android.util.Log.d("KaraokeEngine", "[HOST] 🎵 PLAYBACK STARTED!")
+                } else {
+                    android.util.Log.w("KaraokeEngine", "[HOST] Already playing!")
+                }
+            } ?: android.util.Log.w("KaraokeEngine", "[HOST] MediaPlayer not initialized!")
+        } catch (e: Exception) {
+            android.util.Log.e("KaraokeEngine", "[HOST] Failed to start playback: ${e.message}", e)
         }
     }
 
@@ -181,10 +222,27 @@ class KaraokeEngine @Inject constructor(
                      break
                 }
 
+                // Calculate current time in song
                 val currentSec = if (config.isPlaybackEnabled) {
+                    // Host: Use MediaPlayer position (sync with actual audio!)
                     (player?.currentPosition ?: 0) / 1000.0
                 } else {
-                    0.0 
+                    // Guest: Use server time sync
+                    if (config.startTimeMs > 0) {
+                        val now = System.currentTimeMillis()
+                        val elapsedMs = now - config.startTimeMs
+                        val elapsed = elapsedMs / 1000.0
+                        
+                        // Debug log every 2 seconds
+                        if (elapsedMs % 2000 < 100) {
+                            android.util.Log.d("KaraokeEngine", "[GUEST] Now: $now, StartTime: ${config.startTimeMs}, Elapsed: ${elapsed}s")
+                        }
+                        
+                        elapsed
+                    } else {
+                        android.util.Log.w("KaraokeEngine", "[GUEST] WARNING: startTimeMs = 0! Timing broken!")
+                        0.0
+                    }
                 }
 
                 val manualOffsetSec = latencyOffsetMs / 1000.0
