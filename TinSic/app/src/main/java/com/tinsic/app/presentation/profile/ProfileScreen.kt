@@ -20,8 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +87,31 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Sign Out Button
+        Button(
+            onClick = onSignOut,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF1A1A1A)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = "Sign Out",
+                tint = Color(0xFFFF6B6B)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Sign Out",
+                color = Color(0xFFFF6B6B),
+                fontWeight = FontWeight.Medium
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
     }
 

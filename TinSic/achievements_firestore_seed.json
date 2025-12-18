@@ -1,0 +1,112 @@
+{
+  "achievements": {
+    "pop_lover_1": {
+      "id": "pop_lover_1",
+      "titleRes": "achievement_pop_lover_1_title",
+      "descriptionRes": "achievement_pop_lover_1_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/813/813419.png",
+      "type": "LISTEN_GENRE",
+      "criteriaValue": "Pop",
+      "targetCount": 10,
+      "experienceReward": 50,
+      "nextTierId": "pop_lover_2"
+    },
+    "pop_lover_2": {
+      "id": "pop_lover_2",
+      "titleRes": "achievement_pop_lover_2_title",
+      "descriptionRes": "achievement_pop_lover_2_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/2928/2928892.png",
+      "type": "LISTEN_GENRE",
+      "criteriaValue": "Pop",
+      "targetCount": 30,
+      "experienceReward": 150,
+      "nextTierId": null
+    },
+    "rap_master_1": {
+      "id": "rap_master_1",
+      "titleRes": "achievement_rap_master_1_title",
+      "descriptionRes": "achievement_rap_master_1_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/2928/2928788.png",
+      "type": "LISTEN_GENRE",
+      "criteriaValue": "Rap",
+     "targetCount": 5,
+      "experienceReward": 40,
+      "nextTierId": "rap_master_2"
+    },
+    "rap_master_2": {
+      "id": "rap_master_2",
+      "titleRes": "achievement_rap_master_2_title",
+      "descriptionRes": "achievement_rap_master_2_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/3048/3048425.png",
+      "type": "LISTEN_GENRE",
+      "criteriaValue": "Rap",
+      "targetCount": 15,
+      "experienceReward": 120,
+      "nextTierId": null
+    },
+    "vietnamese_soul_1": {
+      "id": "vietnamese_soul_1",
+      "titleRes": "achievement_vietnamese_soul_1_title",
+      "descriptionRes": "achievement_vietnamese_soul_1_description",
+      "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-vietnam_1f1fb-1f1f3.png",
+      "type": "LISTEN_COUNTRY",
+      "criteriaValue": "Vietnam",
+      "targetCount": 15,
+      "experienceReward": 75,
+      "nextTierId": "vietnamese_soul_2"
+    },
+    "vietnamese_soul_2": {
+      "id": "vietnamese_soul_2",
+      "titleRes": "achievement_vietnamese_soul_2_title",
+      "descriptionRes": "achievement_vietnamese_soul_2_description",
+      "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-vietnam_1f1fb-1f1f3.png",
+      "type": "LISTEN_COUNTRY",
+      "criteriaValue": "Vietnam",
+      "targetCount": 30,
+      "experienceReward": 200,
+      "nextTierId": null
+    },
+    "global_explorer_1": {
+      "id": "global_explorer_1",
+      "titleRes": "achievement_global_explorer_1_title",
+      "descriptionRes": "achievement_global_explorer_1_description",
+      "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-united-kingdom_1f1ec-1f1e7.png",
+      "type": "LISTEN_COUNTRY",
+      "criteriaValue": "US_UK",
+      "targetCount": 15,
+      "experienceReward": 75,
+      "nextTierId": "global_explorer_2"
+    },
+    "global_explorer_2": {
+      "id": "global_explorer_2",
+      "titleRes": "achievement_global_explorer_2_title",
+      "descriptionRes": "achievement_global_explorer_2_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "type": "LISTEN_COUNTRY",
+      "criteriaValue": "US_UK",
+      "targetCount": 30,
+      "experienceReward": 200,
+      "nextTierId": null
+    },
+    "music_addict_1": {
+      "id": "music_addict_1",
+      "titleRes": "achievement_music_addict_1_title",
+      "descriptionRes": "achievement_music_addict_1_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/3767/3767078.png",
+      "type": "TOTAL_SONGS",
+      "targetCount": 20,
+      "experienceReward": 100,
+      "nextTierId": "music_addict_2"
+    },
+    "music_addict_2": {
+      "id": "music_addict_2",
+      "titleRes": "achievement_music_addict_2_title",
+      "descriptionRes": "achievement_music_addict_2_description",
+      "iconUrl": "https://cdn-icons-png.flaticon.com/512/1048/1048949.png",
+      "type": "TOTAL_SONGS",
+      "targetCount": 40,
+      "experienceReward": 300,
+      "nextTierId": null
+    }
+  }
+}
