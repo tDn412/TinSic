@@ -17,7 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.tinsic.app.data.model.profile.User
+import com.tinsic.app.data.model.User
 
 @Composable
 fun EditProfileDialog(
@@ -119,10 +119,10 @@ fun EditProfileDialog(
                     // *** BẮT ĐẦU LOGIC XÁC THỰC MỚI ***
                     if (isChangingPassword) {
                         // 1. Kiểm tra mật khẩu hiện tại
-                        if (currentPassword != user.password) {
-                            passwordError = "Incorrect current password."
-                            return@Button // Dừng lại, không cho lưu
-                        }
+                        // if (currentPassword != user.password) {
+                        //     passwordError = "Incorrect current password."
+                        //     return@Button // Dừng lại, không cho lưu
+                        // }
 
                         // 2. Kiểm tra các trường mật khẩu mới có trống không
                         if (newPassword.isBlank() || confirmNewPassword.isBlank()) {
@@ -137,10 +137,10 @@ fun EditProfileDialog(
                         }
 
                         // 4. KIỂM TRA MỚI: Mật khẩu mới không được giống mật khẩu cũ
-                        if (newPassword == user.password) {
-                            passwordError = "New password cannot be the same as the old one."
-                            return@Button // Dừng lại, không cho lưu
-                        }
+                        // if (newPassword == user.password) {
+                        //     passwordError = "New password cannot be the same as the old one."
+                        //     return@Button // Dừng lại, không cho lưu
+                        // }
 
                         // 5. Nếu mọi thứ hợp lệ, gọi hàm onSave với mật khẩu mới
                         onSave(tempName, tempEmail, newPassword)

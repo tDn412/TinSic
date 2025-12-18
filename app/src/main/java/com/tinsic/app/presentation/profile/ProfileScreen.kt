@@ -48,6 +48,7 @@ import com.tinsic.app.data.model.profile.MusicDnaProfile
 import com.tinsic.app.utils.profile.SharableDnaImage
 import com.tinsic.app.utils.profile.captureComposableToBitmap
 import com.tinsic.app.utils.profile.shareBitmap
+import com.tinsic.app.ui.profile.PlaylistSection
 import kotlinx.coroutines.launch
 
 
@@ -87,6 +88,11 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         AchievementSection()
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Playlist Section
+        val playlists by profileViewModel.playlists.collectAsState()
+        PlaylistSection(playlists = playlists, onPlaylistClick = onPlaylistClick)
         Spacer(modifier = Modifier.height(24.dp))
         
         // Sign Out Button
