@@ -8,8 +8,9 @@ data class Song(
     val audioUrl: String = "",
     val coverUrl: String = "",
     val lyricUrl: String = "",
-    val duration: Long = 0L // Duration in milliseconds
+    val duration: Long = 0L, // Duration in milliseconds
+    val country: String = "Unknown"
 ) {
     // Empty constructor for Firebase
-    constructor() : this("", "", "", "", "", "", "", 0L)
+    constructor() : this("", "", "", "", "", "", "", 0L, "Unknown")
 }

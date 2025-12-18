@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,8 +37,29 @@ fun HomeScreen(
     onHistoryClick: () -> Unit
 ) {
     val songs by viewModel.songs.collectAsState()
-    val selectedGenre by viewModel.selectedGenre.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val likedSongs by viewModel.likedSongs.collectAsState()
+    val userPlaylists by viewModel.userPlaylists.collectAsState()
+    
+    // Recommendations
+    val quickPicks by viewModel.quickPicks.collectAsState()
+    val keepListening by viewModel.keepListening.collectAsState()
+
+    var showPlaylistDialog by remember { mutableStateOf(false) }
+    var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
+
+    if (showPlaylistDialog && songToAddToPlaylist != null) {
+        com.tinsic.app.presentation.components.PlaylistSelectionDialog(
+            playlists = userPlaylists,
+            onDismiss = { showPlaylistDialog = false },
+            onPlaylistSelected = { playlistId ->
+                songToAddToPlaylist?.let { viewModel.addToPlaylist(playlistId, it.id) }
+            },
+            onCreatePlaylist = { name ->
+                songToAddToPlaylist?.let { viewModel.createPlaylist(name, it.id) }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -46,67 +69,58 @@ fun HomeScreen(
         // Header
         HomeHeader(onProfileClick = onProfileClick, onHistoryClick = onHistoryClick)
 
-        // Filter (bo phan nay)
-        LazyRow(
-            modifier = Modifier.padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            items(viewModel.genres) { genre ->
-                FilterChip(
-                    selected = genre == selectedGenre,
-                    onClick = { viewModel.filterByGenre(genre) },
-                    label = { Text(genre) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = NeonPurple,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                )
-            }
-        }
+        // Filter Removed as requested
 
         if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = NeonPurple)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = NeonPurple)
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Quick Picks Section
+            item {
+                SectionTitle("Quick Picks")
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // Quick Picks Section
-                item {
-                    SectionTitle("Quick Picks")
-                }
-                
-                val quickPicks = viewModel.getQuickPicks()
-                items(quickPicks) { song ->
-                    SongListItem(song = song, onClick = { onSongClick(song, quickPicks) })
-                }
+            
+            items(quickPicks) { song ->
+                val isLiked = likedSongs.contains(song.id)
+                SongListItem(
+                    song = song,
+                    isLiked = isLiked,
+                    onClick = { onSongClick(song, quickPicks) },
+                    onToggleLike = { viewModel.toggleLike(song.id) },
+                    onAddToPlaylist = {
+                        songToAddToPlaylist = song
+                        showPlaylistDialog = true
+                    }
+                )
+            }
 
-                // Keep Listening Section
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionTitle("Keep Listening")
-                }
+            // Keep Listening Section
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionTitle("Keep Listening")
+            }
 
-                item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        val keepListening = viewModel.getKeepListening()
-                        items(keepListening) { song ->
-                            KeepListeningCard(song = song, onClick = { onSongClick(song, keepListening) })
-                        }
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(keepListening) { song ->
+                         KeepListeningCard(song = song, onClick = { onSongClick(song, keepListening) })
                     }
                 }
             }
         }
     }
+}
 }
 
 @Composable
@@ -166,7 +180,15 @@ fun SectionTitle(title: String) {
 }
 
 @Composable
-fun SongListItem(song: Song, onClick: () -> Unit) {
+fun SongListItem(
+    song: Song,
+    isLiked: Boolean = false,
+    onClick: () -> Unit,
+    onToggleLike: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {}
+) {
+    var expanded by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -214,13 +236,42 @@ fun SongListItem(song: Song, onClick: () -> Unit) {
                 )
             }
 
-            // More Options
-            IconButton(onClick = { /* Show options */ }) {
+            // Liked Status (Heart)
+            if (isLiked) {
                 Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = "More options",
-                    tint = MaterialTheme.colorScheme.onSurface
+                   Icons.Default.Favorite,
+                   "Liked",
+                   tint = NeonPurple,
+                   modifier = Modifier.size(20.dp).padding(end = 8.dp)
                 )
+            }
+
+            // More Options
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add to Playlist") },
+                        onClick = {
+                            expanded = false
+                            onAddToPlaylist()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.QueueMusic, null)
+                        }
+                    )
+                    // Toggle Like via Menu optional
+                }
             }
         }
     }

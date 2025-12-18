@@ -148,17 +148,34 @@ class UserRepository @Inject constructor(
     suspend fun getFullHistory(userId: String): List<com.tinsic.app.data.model.HistoryItem> {
         return try {
             firestore.collection("users").document(userId)
-                .collection("history")
-                .orderBy("playedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .get()
-                .await()
-                .documents
-                .mapNotNull { doc ->
-                    doc.toObject(com.tinsic.app.data.model.HistoryItem::class.java)?.copy(id = doc.id)
-                }
+            .collection("history")
+            .orderBy("playedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(com.tinsic.app.data.model.HistoryItem::class.java)?.copy(id = doc.id)
+            }
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    fun getHistoryFlow(userId: String): Flow<List<com.tinsic.app.data.model.HistoryItem>> = callbackFlow {
+        val listener = firestore.collection("users").document(userId)
+            .collection("history")
+            .orderBy("playedAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val history = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(com.tinsic.app.data.model.HistoryItem::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+                trySend(history)
+            }
+        awaitClose { listener.remove() }
     }
     suspend fun createPlaylist(userId: String, name: String): Result<String> {
         return try {

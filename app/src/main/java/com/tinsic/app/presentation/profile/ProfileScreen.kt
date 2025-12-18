@@ -1,208 +1,131 @@
 package com.tinsic.app.presentation.profile
 
+import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.tinsic.app.presentation.auth.AuthViewModel
-import com.tinsic.app.ui.theme.CardBackground
-import com.tinsic.app.ui.theme.NeonPurple
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.collectAsState
+import com.tinsic.app.data.model.User
+import com.tinsic.app.data.model.profile.MusicDnaProfile
+import com.tinsic.app.utils.profile.SharableDnaImage
+import com.tinsic.app.utils.profile.captureComposableToBitmap
+import com.tinsic.app.utils.profile.shareBitmap
+import kotlinx.coroutines.launch
+
+
 
 @Composable
 fun ProfileScreen(
-    authViewModel: AuthViewModel = hiltViewModel(),
-    profileViewModel: ProfileViewModel = hiltViewModel(),
     onSignOut: () -> Unit,
-    onPlaylistClick: (String, String) -> Unit
+    onPlaylistClick: (String, String) -> Unit,
+    authViewModel: com.tinsic.app.presentation.auth.AuthViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+    profileViewModel: com.tinsic.app.presentation.profile.ProfileViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
-    val currentUser by authViewModel.currentUser.collectAsState()
-    val playlists by profileViewModel.playlists.collectAsState()
+    val scrollState = rememberScrollState()
+    
+    val user by authViewModel.currentUser.collectAsState()
+    val dnaProfile by profileViewModel.musicDna.collectAsState()
+    val listeningHistory by profileViewModel.listeningHistory.collectAsState()
+    
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    // Safe unwrap user for UI, fallback to empty if null (though should be logged in)
+    val currentUser = user ?: User(uid = "", email = "", displayName = "Loading...")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .background(Color(0xFF0A0A0A))
+            .padding(bottom = 80.dp)
     ) {
-        // ... (Header remains same, logic for sign out remains same) ...
-        // Profile Header
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = CardBackground,
-            tonalElevation = 4.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Avatar
-                Surface(
-                    modifier = Modifier.size(80.dp),
-                    shape = CircleShape,
-                    color = NeonPurple
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = "Profile",
-                        modifier = Modifier.padding(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+        HeaderSection(user = currentUser, onEditProfileClick = { showEditDialog = true })
+        Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+        StatsSection(currentUser, listeningHistory = listeningHistory)
+        Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = currentUser?.displayName ?: "User",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+        MusicDNASection(dnaProfile = dnaProfile, currentUser)
+        Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = currentUser?.email ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
-        }
-
+        AchievementSection()
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Listen to Your Music (Playlist Header)
-        Text(
-            text = "Your Playlists",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Playlists List
-        LazyColumn(
-            modifier = Modifier.weight(1f)
-        ) {
-            items(playlists) { playlist ->
-                PlaylistItem(
-                    playlist = playlist,
-                    onClick = { onPlaylistClick(playlist.id, playlist.userId) }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            
-            // Sign Out Button (at bottom of list or fixed? Let's keep it fixed at bottom of column)
-            // But LazyColumn takes weight, so we put Spacer and Button outside/after LazyColumn if we want fixed footer.
-            // Oh wait, LazyColumn is `weight(1f)`, so it takes available space.
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Sign Out Button
         Button(
-            onClick = {
-                authViewModel.signOut()
-                onSignOut()
-            },
+            onClick = onSignOut,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
+                .padding(horizontal = 16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error
-            )
+                containerColor = Color(0xFF1A1A1A)
+            ),
+            shape = RoundedCornerShape(12.dp)
         ) {
+            Icon(
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = "Sign Out",
+                tint = Color(0xFFFF6B6B)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Sign Out",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                "Sign Out",
+                color = Color(0xFFFF6B6B),
+                fontWeight = FontWeight.Medium
             )
         }
+        Spacer(modifier = Modifier.height(16.dp))
     }
-}
 
-@Composable
-fun PlaylistItem(
-    playlist: com.tinsic.app.data.model.Playlist,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = CardBackground,
-        tonalElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Icon/Cover
-            Surface(
-                modifier = Modifier.size(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = if (playlist.isDefault) NeonPurple.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                 Box(contentAlignment = Alignment.Center) {
-                     Icon(
-                         imageVector = if (playlist.isDefault) Icons.Default.Favorite else Icons.Default.QueueMusic,
-                         contentDescription = null,
-                         tint = if (playlist.isDefault) NeonPurple else MaterialTheme.colorScheme.onSurfaceVariant
-                     )
-                 }
+    if (showEditDialog) {
+        // TODO: Pass onSignOut to EditProfileDialog or separate Settings screen
+        // TODO: Implement proper user update via AuthViewModel/UserRepository
+        EditProfileDialog(
+            user = currentUser,
+            onDismiss = { showEditDialog = false },
+            onSave = { newName, newEmail ->
+                // Note: This is temporary. Real implementation should call
+                // userRepository.updateUser() and update Firebase
+                showEditDialog = false
             }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${playlist.songIds.size} Songs",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun StatItem(label: String, value: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = NeonPurple
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
     }
 }

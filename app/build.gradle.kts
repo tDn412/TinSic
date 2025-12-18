@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.tinsic.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.tinsic.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -32,6 +32,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -66,13 +67,13 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3:1.1.2")
+    implementation("androidx.compose.material3:material3:1.3.1")
     implementation("androidx.compose.material:material-icons-extended")
-    
+
     // Lifecycle & ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-    
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
@@ -89,6 +90,8 @@ dependencies {
 
     // Hilt for Dependency Injection
     implementation("com.google.dagger:hilt-android:2.48.1")
+
+    implementation("androidx.room:room-runtime:2.6.1")
     kapt("com.google.dagger:hilt-android-compiler:2.48.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
 
@@ -105,6 +108,7 @@ dependencies {
     implementation("androidx.media3:media3-session:1.2.0")
     implementation("androidx.media3:media3-database:1.2.0")
     implementation("androidx.media3:media3-datasource:1.2.0")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     // TensorFlow Lite (Karaoke Module)
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
@@ -126,4 +130,17 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("dev.shreyaspatil:capturable:1.0.3")
+    implementation("androidx.compose.material:material-icons-extended-android:1.6.7")
+
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin" && requested.name.startsWith("kotlin-stdlib")) {
+                useVersion("1.9.23")
+            }
+        }
+    }
 }

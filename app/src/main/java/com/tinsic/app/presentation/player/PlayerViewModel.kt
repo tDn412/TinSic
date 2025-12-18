@@ -95,7 +95,7 @@ class PlayerViewModel @Inject constructor(
                  _duration.value = exoPlayer.duration.takeIf { it > 0 } ?: 0L
             }
              if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
-                 playNext() // Auto play next
+                 playNext(auto = true) // Auto play next
             }
         }
         
@@ -182,26 +182,7 @@ class PlayerViewModel @Inject constructor(
         _isLiked.value = likedSongs.contains(songId)
     }
 
-    fun toggleLike() {
-        val songId = _currentSong.value?.id ?: return
-        val uid = auth.currentUser?.uid ?: return
-        val currentLiked = _isLiked.value
-        
-        // Optimistic Update
-        _isLiked.value = !currentLiked
-        
-        viewModelScope.launch {
-            val result = if (currentLiked) {
-                userRepository.dislikeSong(uid, songId)
-            } else {
-                userRepository.likeSong(uid, songId)
-            }
-            // Revert if failed (optional, usually firestore listener will correct it)
-             if (result.isFailure) {
-                 _isLiked.value = currentLiked
-             }
-        }
-    }
+
 
     fun playSong(song: Song) {
         isPreviewMode = false
@@ -278,6 +259,10 @@ class PlayerViewModel @Inject constructor(
         // _isPlaying.value = false -> REMOVED
         historyTrackingJob?.cancel()
     }
+    
+    fun play() {
+        exoPlayer.play()
+    }
 
     fun playPause() {
         if (exoPlayer.isPlaying) {
@@ -306,28 +291,51 @@ class PlayerViewModel @Inject constructor(
         android.util.Log.d("PlayerViewModel", "currentSong cleared: ${_currentSong.value}")
     }
 
-    fun playNext() {
-        if (_playlist.value.isEmpty()) return
-        
-        currentIndex = if (_isShuffleEnabled.value) {
-            (0 until _playlist.value.size).random()
-        } else {
-            (currentIndex + 1) % _playlist.value.size
+    private var originalPlaylist: List<Song> = emptyList()
+
+    fun setPlaylist(songs: List<Song>, startIndex: Int = 0) {
+        originalPlaylist = songs
+        _playlist.value = songs
+        currentIndex = startIndex
+        if (songs.isNotEmpty()) {
+            playSong(songs[startIndex])
         }
-        
-        playSong(_playlist.value[currentIndex])
     }
 
-    fun playPrevious() {
-        if (_playlist.value.isEmpty()) return
-        
-        currentIndex = if (currentIndex > 0) {
-            currentIndex - 1
+    fun toggleShuffle() {
+        val wasEnabled = _isShuffleEnabled.value
+        _isShuffleEnabled.value = !wasEnabled
+
+        if (!wasEnabled) {
+            // Turning Shuffle ON
+            val currentSong = _currentSong.value ?: return
+            // Filter current song out, shuffle the rest
+            val shuffledRest = originalPlaylist.filter { it.id != currentSong.id }.shuffled()
+            val newPlaylist = listOf(currentSong) + shuffledRest
+            _playlist.value = newPlaylist
+            
+            // Current song is now always at index 0
+            currentIndex = 0
+            
+            android.util.Log.d("PlayerViewModel", "Shuffle ON: Playlist reordered. Size: ${newPlaylist.size}")
         } else {
-            _playlist.value.size - 1
+            // Turning Shuffle OFF
+            val currentSong = _currentSong.value ?: return
+            // Restore original order
+            _playlist.value = originalPlaylist
+            
+            // Find where current song is in original list
+            currentIndex = originalPlaylist.indexOfFirst { it.id == currentSong.id }.takeIf { it != -1 } ?: 0
+            
         }
-        
-        playSong(_playlist.value[currentIndex])
+    }
+
+    fun toggleRepeat() {
+        _repeatMode.value = when (_repeatMode.value) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
     }
 
     fun createPlaylist(name: String, addCurrentSong: Boolean) {
@@ -350,23 +358,64 @@ class PlayerViewModel @Inject constructor(
          }
     }
 
-    fun toggleShuffle() {
-        _isShuffleEnabled.value = !_isShuffleEnabled.value
-    }
+    fun playNext(auto: Boolean = false) {
+        if (_playlist.value.isEmpty()) return
 
-    fun toggleRepeat() {
-        _repeatMode.value = when (_repeatMode.value) {
-            RepeatMode.OFF -> RepeatMode.ALL
-            RepeatMode.ALL -> RepeatMode.ONE
-            RepeatMode.ONE -> RepeatMode.OFF
+        // Handle RepeatMode.ONE
+        if (auto && _repeatMode.value == RepeatMode.ONE) {
+            seekTo(0)
+            exoPlayer.play()
+            return
         }
+
+        val currentList = _playlist.value
+        var nextIndex = currentIndex + 1
+
+        if (nextIndex >= currentList.size) {
+            // End of list
+            if (auto && _repeatMode.value == RepeatMode.OFF) {
+                pause()
+                seekTo(0)
+                return
+            }
+            // Loop back (Repeat ALL or Manual Next)
+            nextIndex = 0
+        }
+
+        currentIndex = nextIndex
+        playSong(currentList[currentIndex])
+    }
+    
+    fun playPrevious() {
+        if (_playlist.value.isEmpty()) return
+        
+        currentIndex = if (currentIndex > 0) {
+            currentIndex - 1
+        } else {
+            _playlist.value.size - 1
+        }
+        
+        playSong(_playlist.value[currentIndex])
     }
 
-    fun setPlaylist(songs: List<Song>, startIndex: Int = 0) {
-        _playlist.value = songs
-        currentIndex = startIndex
-        if (songs.isNotEmpty()) {
-            playSong(songs[startIndex])
+    fun toggleLikeCurrentSong() {
+        val songId = _currentSong.value?.id ?: return
+        val uid = auth.currentUser?.uid ?: return
+        val currentLiked = _isLiked.value
+        
+        // Optimistic UI Update
+        _isLiked.value = !currentLiked
+        
+        viewModelScope.launch {
+            val result = if (currentLiked) {
+                userRepository.dislikeSong(uid, songId)
+            } else {
+                userRepository.likeSong(uid, songId)
+            }
+             if (result.isFailure) {
+                 // Revert on failure
+                 _isLiked.value = currentLiked
+             }
         }
     }
     
@@ -453,6 +502,106 @@ class PlayerViewModel @Inject constructor(
         _playlist.value = currentList
     }
     
+    // Translation
+    private val translationRepository = com.tinsic.app.data.repository.GeminiTranslationRepository()
+    private val AP_KEY = "AIzaSyANNK_oUk-gZ3jzwEqW31hBbt_trG3qOrM"
+    
+    private val _isTranslationEnabled = MutableStateFlow(false)
+    val isTranslationEnabled: StateFlow<Boolean> = _isTranslationEnabled.asStateFlow()
+
+    private val _isTranslating = MutableStateFlow(false)
+    val isTranslating: StateFlow<Boolean> = _isTranslating.asStateFlow()
+    
+    // Cache for translations: SongID -> List<TranslationString>
+    private val translationCache = mutableMapOf<String, List<String>>()
+
+    fun toggleTranslation() {
+        if (!isTranslationEligible()) {
+            android.util.Log.d("PlayerViewModel", "Translation not eligible for this song.")
+            return
+        }
+        
+        _isTranslationEnabled.value = !_isTranslationEnabled.value
+        
+        if (_isTranslationEnabled.value) {
+            translateCurrentLyrics()
+        }
+    }
+    
+    fun isTranslationEligible(): Boolean {
+        // Now eligible for ALL songs including Vietnam (which will translate to English)
+        return _currentSong.value != null
+    }
+
+    private fun translateCurrentLyrics() {
+        val song = _currentSong.value ?: return
+        val currentLyrics = _lyrics.value
+        android.util.Log.d("PlayerViewModel", "translateCurrentLyrics: Song=${song.title}, Lines=${currentLyrics.size}")
+        
+        if (currentLyrics.isEmpty()) return
+        
+        // Determine target language: Vietnam -> English, Others -> Vietnamese
+        val isVietnameseSong = song.country.equals("Vietnam", ignoreCase = true) || song.country.equals("VN", ignoreCase = true)
+        val targetLanguage = if (isVietnameseSong) "English" else "Vietnamese"
+
+        // Check cache
+        if (translationCache.containsKey(song.id)) {
+            android.util.Log.d("PlayerViewModel", "Using cached translation")
+            applyTranslation(translationCache[song.id]!!)
+            return
+        }
+        
+        viewModelScope.launch {
+            _isTranslating.value = true
+            val wasPlaying = _isPlaying.value
+            if (wasPlaying) {
+                pause() // Auto-pause
+            }
+
+            val originalLines = currentLyrics.map { it.text }
+            android.util.Log.d("PlayerViewModel", "Requesting translation to $targetLanguage for ${originalLines.size} lines")
+            val translatedLines = translationRepository.translateLyrics(originalLines, AP_KEY, targetLanguage)
+            
+            if (translatedLines.isNotEmpty()) {
+                if (translatedLines.size == originalLines.size) {
+                    android.util.Log.d("PlayerViewModel", "Translation success: Exact match")
+                } else {
+                     android.util.Log.e("PlayerViewModel", "Translation mismatch: Orig=${originalLines.size}, Trans=${translatedLines.size}")
+                }
+                translationCache[song.id] = translatedLines
+                applyTranslation(translatedLines)
+                
+                if (wasPlaying) {
+                    play() // Auto-resume if it was playing
+                }
+            } else {
+                 android.util.Log.e("PlayerViewModel", "Translation failed or empty response")
+            }
+            _isTranslating.value = false
+        }
+    }
+    
+    private fun applyTranslation(translatedLines: List<String>) {
+        val currentLyrics = _lyrics.value
+        // We must update the MutableStateFlow list elements. 
+        // Since LyricLine is a data class with 'var translation', we can modify elements
+        // BUT Flow emission emits same list reference unless we copy.
+        // Better to map to new list.
+        
+        val newLyrics = currentLyrics.mapIndexed { index, line ->
+            if (index < translatedLines.size) {
+                line.copy(translation = translatedLines[index]) // copy is needed if we used val, but we used var. 
+                // Actually copy() is cleaner if we want to trigger state flow update with new object refs.
+                // Wait, I defined 'var translation'.
+                line.apply { translation = translatedLines[index] }
+            } else {
+                line
+            }
+        }
+        _lyrics.value = newLyrics
+    }
+    
+    // Update removeFromQueue to keep existing logic
     fun removeFromQueue(index: Int) {
         if (index in _playlist.value.indices && index != currentIndex) {
             val currentList = _playlist.value.toMutableList()
