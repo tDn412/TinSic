@@ -254,7 +254,8 @@ class PartyViewModel @Inject constructor(
                             name = member.displayName,
                             avatar = member.avatar,
                             color = Color(member.color),
-                            score = member.score
+                            score = member.score,
+                            joinedAt = member.joinedAt // Added
                         )
                     }
                     _connectedUsers.value = membersList
@@ -269,7 +270,8 @@ class PartyViewModel @Inject constructor(
                             name = member.displayName,
                             avatar = member.avatar,
                             color = Color(member.color),
-                            score = member.score
+                            score = member.score,
+                            joinedAt = member.joinedAt // Added
                         )
                     }
                     _stageUsers.value = stageList

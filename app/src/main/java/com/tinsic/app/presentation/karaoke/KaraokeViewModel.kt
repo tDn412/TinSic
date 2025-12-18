@@ -113,7 +113,9 @@ class KaraokeViewModel @Inject constructor(
         // This is now determined by who is the "first" person on stage.
         shouldPlayAudio: Boolean = false, 
         
-        startTimeMs: Long = 0L           // Server start time for guest sync
+        startTimeMs: Long = 0L,          // Server start time for guest sync
+        mySingerId: Int = 1,             // New: Singer ID (1 or 2)
+        isSoloMode: Boolean = false      // New: Solo Override
     ) {
         _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
@@ -137,10 +139,11 @@ class KaraokeViewModel @Inject constructor(
                 audioUrl = audioUrl,
                 mp3FilePath = mp3FilePath,   // Local file (instant load if available!)
                 isPlaybackEnabled = shouldPlayAudio,  // Determined by stage order
-
             isRecordingEnabled = true,   // Everyone records for scoring
             startTimeMs = startTimeMs,   // Server time for guest sync
-            initialLatencyOffsetMs = _latencyOffset.value
+            initialLatencyOffsetMs = _latencyOffset.value,
+            mySingerId = mySingerId,
+            isSoloMode = isSoloMode     // Pass to engine
         )
 
             karaokeEngine.startRecording(notes, config)
@@ -156,7 +159,9 @@ class KaraokeViewModel @Inject constructor(
         lyrics: List<LyricLine>,
         audioUrl: String = "",
         mp3FilePath: String? = null,
-        shouldPlayAudio: Boolean = false
+        shouldPlayAudio: Boolean = false,
+        mySingerId: Int = 1,
+        isSoloMode: Boolean = false // New
     ) {
         viewModelScope.launch {
             _uiState.update {
@@ -172,7 +177,9 @@ class KaraokeViewModel @Inject constructor(
                 isPlaybackEnabled = shouldPlayAudio,
                 isRecordingEnabled = true,
                 startTimeMs = 0L,
-                initialLatencyOffsetMs = _latencyOffset.value
+                initialLatencyOffsetMs = _latencyOffset.value,
+                mySingerId = mySingerId,
+                isSoloMode = isSoloMode // Pass to engine
             )
             
             karaokeEngine.startRecording(notes, config)

@@ -25,7 +25,9 @@ data class KaraokeConfig(
     val isPlaybackEnabled: Boolean = true,        // Host-only flag
     val isRecordingEnabled: Boolean = true,       // Always true for scoring
     val startTimeMs: Long = 0L,                   // Server start time for guest sync
-    val initialLatencyOffsetMs: Int = 0
+    val initialLatencyOffsetMs: Int = 0,
+    val mySingerId: Int = 1,                      // 1=Singer1, 2=Singer2 (For Duet Scoring)
+    val isSoloMode: Boolean = false               // If true, ignore singerId restrictions
 )
 
 class KaraokeEngine @Inject constructor(
@@ -318,13 +320,18 @@ class KaraokeEngine @Inject constructor(
 
                     // 4. Scoring
                     if (activeNote != null) {
+                        // Check if it's this user's turn
+                        // singerId 3 means BOTH (Duet)
+                        val isMyTurn = config.isSoloMode || activeNote.singerId == 3 || activeNote.singerId == config.mySingerId
+                        
                         val result = scoringEngine.evaluate(
                             userMidi = userMidi,
                             targetMidi = activeNote.midi,
                             targetNoteName = activeNote.name,
                             confidence = confidence,
                             rms = rms,
-                            currentTime = adjustedTime
+                            currentTime = adjustedTime,
+                            isMyTurn = isMyTurn
                         )
                         _singingFlow.emit(result.copy(currentTime = adjustedTime))
                     } else {

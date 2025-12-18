@@ -151,6 +151,17 @@ class KaraokePartyController @Inject constructor(
         // 1. Download & Parse Pitch Data (JSON)
         val pitchJson = URL(song.pitchDataUrl).readText()
         val jsonObject = JSONObject(pitchJson)
+
+        // Parse Segments (if available)
+        data class Segment(val start: Double, val end: Double, val singer: Int)
+        val segmentsList = mutableListOf<Segment>()
+        if (jsonObject.has("segments")) {
+            val segArray = jsonObject.getJSONArray("segments")
+            for (i in 0 until segArray.length()) {
+                val s = segArray.getJSONObject(i)
+                segmentsList.add(Segment(s.getDouble("start"), s.getDouble("end"), s.getInt("singer")))
+            }
+        }
         
         // JSON structure: { "tracks": [ { "notes": [...] } ] }
         val tracks = jsonObject.getJSONArray("tracks")
@@ -169,12 +180,18 @@ class KaraokePartyController @Inject constructor(
             // Transpose high notes down one octave  
             val transposedMidi = if (originalMidi > 65) originalMidi - 12 else originalMidi
 
+            // Determine singerId for this note based on segments
+            // Default to 1 (Main Singer) if no segment found
+            val noteStart = noteObj.getDouble("time")
+            val noteSingerId = segmentsList.find { noteStart >= it.start && noteStart < it.end }?.singer ?: 1
+
             rawNotes.add(
                 SongNote(
                     midi = transposedMidi,
                     name = noteObj.optString("name", ""),
-                    startSec = noteObj.getDouble("time"),
-                    durationSec = noteObj.getDouble("duration")
+                    startSec = noteStart,
+                    durationSec = noteObj.getDouble("duration"),
+                    singerId = noteSingerId
                 )
             )
         }

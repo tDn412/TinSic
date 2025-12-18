@@ -349,16 +349,28 @@ fun ActivePartyRoom(
             val shouldPlayAudio = currentUser.id == audioControllerId
             val audioUrl = queueWithUrls[currentSongId]?.audioUrl ?: ""
             
+            // Determine Singer ID (1 or 2) based on joining order
+            // stageUsers is likely not sorted by joinedAt here, we should rely on partyViewModel if possible
+            // But usually the list from flow is acceptable. Let's do a safe fallback.
+            val sortedStageUsers = stageUsers.sortedBy { it.joinedAt }
+            val myIndex = sortedStageUsers.indexOfFirst { it.id == currentUser.id }
+            val mySingerId = if (myIndex >= 0) myIndex + 1 else 1
+            
+            // Auto Solo Mode if only 1 person on stage
+            val isSoloMode = stageUsers.size == 1
+
             LaunchedEffect(songNotes, songLyrics, audioUrl, mp3Path, shouldPlayAudio) {
                 if (songNotes.isNotEmpty() && songLyrics.isNotEmpty() && audioUrl.isNotEmpty()) {
-                    android.util.Log.d("KaraokeRoom", "[PREPARE] Preparing karaoke (State: $playbackState) - PlayAudio: $shouldPlayAudio")
+                    android.util.Log.d("KaraokeRoom", "[PREPARE] Preparing karaoke (State: $playbackState) - PlayAudio: $shouldPlayAudio, Solo: $isSoloMode")
                     
                     karaokeViewModel.prepareSinging(
                         notes = songNotes,
                         lyrics = songLyrics,
                         audioUrl = audioUrl,
                         mp3FilePath = mp3Path,
-                        shouldPlayAudio = shouldPlayAudio
+                        shouldPlayAudio = shouldPlayAudio,
+                        mySingerId = mySingerId,
+                        isSoloMode = isSoloMode
                     )
                 }
             }

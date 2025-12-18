@@ -157,10 +157,17 @@ fun KaraokeScreen(
                                     state.currentTime >= line.startTime
                                 }
                                 
+                                val baseColor = when (line.singerId) {
+                                    1 -> Color(0xFF00E5FF) // Cyan (Singer 1)
+                                    2 -> Color(0xFFFF4081) // Pink (Singer 2)
+                                    3 -> Color(0xFFFFD700) // Gold (Both)
+                                    else -> Color(0xFF00E5FF)
+                                }
+
                                 Text(
                                     text = line.content,
                                     style = if (isCurrent) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
-                                    color = if (isCurrent) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.3f),
+                                    color = if (isCurrent) baseColor else baseColor.copy(alpha = 0.3f), // Dim non-active lines
                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
