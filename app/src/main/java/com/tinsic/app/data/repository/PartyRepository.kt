@@ -423,24 +423,73 @@ class PartyRepository @Inject constructor(
      * Update member's score in Firebase
      * Updates both members and stage if user is on stage
      */
-    suspend fun updateMemberScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+
+    suspend fun updateMemberScore(roomId: String, userId: String, newTotalScore: Int, lastScore: Int): Result<Unit> {
         return try {
             val updates = mutableMapOf<String, Any>()
             
-            // Always update in members list
-            updates["members/$userId/score"] = newScore
+            // Update TOTAL score and LAST score in members list
+            updates["members/$userId/score"] = newTotalScore
+            updates["members/$userId/lastScore"] = lastScore
             
             // Also update in stage if user is on stage
-            updates["stage/$userId/score"] = newScore
+            updates["stage/$userId/score"] = newTotalScore
+            updates["stage/$userId/lastScore"] = lastScore
             
             realtimeDb.getReference("parties").child(roomId)
                 .updateChildren(updates).await()
                 
-            android.util.Log.d("PartyRepo", "Score updated: User=$userId, Score=$newScore")
+            android.util.Log.d("PartyRepo", "Score updated: User=$userId, Total=$newTotalScore, Last=$lastScore")
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}", e)
             Result.failure(e)
         }
+    }
+
+    // --- REACTION FUNCTIONS ---
+
+    suspend fun sendReaction(roomId: String, reaction: com.tinsic.app.data.model.PartyReaction): Result<Unit> {
+        return try {
+            val ref = realtimeDb.getReference("parties").child(roomId).child("reactions").push()
+            // Auto-prune logic could go here (e.g. Firebase Cloud Functions), but for client side we just push.
+            // Reaction ID is the key
+            val reactionWithId = reaction.copy(id = ref.key ?: "")
+            ref.setValue(reactionWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun observeReactions(roomId: String): Flow<com.tinsic.app.data.model.PartyReaction> = callbackFlow {
+        val ref = realtimeDb.getReference("parties").child(roomId).child("reactions")
+        // Get reactions only from NOW onwards (crudely implemented via limitToLast or timestamp check)
+        // Ideally, we just listen to ChildAdded.
+        // To avoid fetching old reactions, we could limit to last 1 or rely on ephemeral nature.
+        // Better: Query by timestamp > joinTime?
+        // Simpler: limitToLast(1) initially, then receive new ones.
+        
+        val listener = object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val reaction = snapshot.getValue(com.tinsic.app.data.model.PartyReaction::class.java)
+                if (reaction != null) {
+                    // Filter old reactions if needed (e.g. older than 5 seconds)
+                    if (System.currentTimeMillis() - reaction.timestamp < 10000) {
+                        trySend(reaction)
+                    }
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        
+        // Listen to only the most recent/new reactions
+        ref.limitToLast(10).addChildEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
     }
 }

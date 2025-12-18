@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.random.Random
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +39,9 @@ class PartyViewModel @Inject constructor(
 
     private val _stageUsers = MutableStateFlow<List<PartyUser>>(emptyList())
     val stageUsers: StateFlow<List<PartyUser>> = _stageUsers.asStateFlow()
+
+    private val _audioControllerId = MutableStateFlow("")
+    val audioControllerId: StateFlow<String> = _audioControllerId.asStateFlow()
 
     // Current User (Will be loaded from Firestore)
     private val _currentUser = MutableStateFlow(
@@ -115,34 +119,28 @@ class PartyViewModel @Inject constructor(
                 // Debug log
                 Log.d("PartyVM", "[HostControl] Current User: ${user.id}, Host: $currentHostId, State: ${_playbackState.value}")
                 
-                // Only run if I'm the host
-                if (user.id != currentHostId) {
-                    Log.d("PartyVM", "[HostControl] Not host, skipping...")
+                // Sync Control: Only the Audio Controller (First on Stage) triggers state changes
+                // This ensures only one device writes to Firebase to avoid race conditions.
+                val controllerId = _audioControllerId.value
+                if (user.id != controllerId) {
+                    // Log.d("PartyVM", "[SyncControl] Not audio controller (Me: ${user.id} vs Ctrl: $controllerId), skipping...")
                     return@combine
                 }
-                if (_playbackState.value != "LOADING") return@combine // Not in loading state
+                
+                if (_playbackState.value != "LOADING") return@combine 
 
-                // Calculate required ready count: ALL people on stage (including host if on stage)
-                val requiredCount = stage.size // Just count stage members (host is included if on stage)
+                // Calculate required ready count: ALL people on stage
+                val requiredCount = stage.size 
                 val readyCount = ready.values.count { it }
 
-                Log.d("PartyVM", "[HostControl] Ready: $readyCount/$requiredCount (Stage: ${stage.size})")
-                Log.d("PartyVM", "[HostControl] Ready State: $ready")
-                Log.d("PartyVM", "[HostControl] Stage Users: ${stage.map { it.id }}")
+                Log.d("PartyVM", "[SyncControl] I am Controller! Ready: $readyCount/$requiredCount")
 
                 if (readyCount >= requiredCount && requiredCount > 0) {
-                    Log.d("PartyVM", "[HostControl] All ready! Starting countdown...")
+                    Log.d("PartyVM", "[SyncControl] All ready! Starting countdown...")
                     
-                    // Use Firebase Server Time for perfect sync across all devices
                     val serverTime = partyRepository.getServerTime()
-                    val localTime = System.currentTimeMillis()
-                    // INCREASED BUFFER: 8s to ensure all devices receive startTime before countdown begins
-                    // UI will only show last 5 seconds
+                    // val localTime = System.currentTimeMillis() // Unused but kept for logic comments if needed? No, delete it.
                     val countdownStart = serverTime + 8000
-                    
-                    Log.d("PartyVM", "[HostControl] Local time: $localTime")
-                    Log.d("PartyVM", "[HostControl] Server time: $serverTime (offset: ${serverTime - localTime}ms)")
-                    Log.d("PartyVM", "[HostControl] Countdown start: $countdownStart (8s buffer)")
                     
                     partyRepository.updatePlaybackState(roomIdValue, "COUNTDOWN", countdownStart)
                 }
@@ -153,9 +151,9 @@ class PartyViewModel @Inject constructor(
         viewModelScope.launch {
             playbackState.collect { state ->
                 if (state == "COUNTDOWN") {
-                    // Only host triggers the transition
-                    if (_currentUser.value.id == _hostId.value) {
-                        Log.d("PartyVM", "[Countdown] Starting countdown monitor...")
+                    // Only Audio Controller triggers the transition
+                    if (_currentUser.value.id == _audioControllerId.value) {
+                        Log.d("PartyVM", "[Countdown] Starting countdown monitor (I am Controller)...")
                         
                         // Loop until countdown ends
                         while (_playbackState.value == "COUNTDOWN") {
@@ -166,13 +164,39 @@ class PartyViewModel @Inject constructor(
                             
                             if (timeLeft <= 0) {
                                 Log.d("PartyVM", "[Countdown] Finished! Transitioning to PLAYING...")
-                                partyRepository.updatePlaybackState(_roomId.value, "PLAYING", 0L)
+                                
+                                // CRITICAL: Use countdown end time (NOT new server time!)
+                                // This ensures perfect sync between countdown and playing
+                                val playingStartTime = _startTime.value
+                                Log.d("PartyVM", "[Countdown] Setting PLAYING startTime: $playingStartTime (countdown end)")
+                                
+                                partyRepository.updatePlaybackState(_roomId.value, "PLAYING", playingStartTime)
                                 break
                             }
                             
                             // Check every 100ms for accuracy
                             kotlinx.coroutines.delay(100)
                         }
+                    }
+                }
+            }
+                }
+
+
+        // Result: Auto-transition to IDLE after 10 seconds
+        viewModelScope.launch {
+            playbackState.collect { state ->
+                if (state == "RESULT") {
+                    // Only Audio Controller triggers the transition
+                    if (_currentUser.value.id == _audioControllerId.value) {
+                         Log.d("PartyVM", "[Result] Showing result screen (10s)...")
+                         kotlinx.coroutines.delay(10000) // 10 seconds
+                         
+                         // Double check we are still in RESULT state
+                         if (_playbackState.value == "RESULT") {
+                             Log.d("PartyVM", "[Result] Finished! returning to IDLE.")
+                             partyRepository.updatePlaybackState(_roomId.value, "IDLE", 0L)
+                         }
                     }
                 }
             }
@@ -232,6 +256,11 @@ class PartyViewModel @Inject constructor(
                         return@collect
                     }
                     
+                    // Start listening to reactions (idempotent call)
+                    if (reactionJob == null || !reactionJob!!.isActive) {
+                         subscribeToReactions(roomId)
+                    }
+                    
                     // Update Room Type (Auto-detect)
                     if (_roomType.value != room.type) {
                         _roomType.value = room.type
@@ -245,22 +274,32 @@ class PartyViewModel @Inject constructor(
                             name = member.displayName,
                             avatar = member.avatar,
                             color = Color(member.color),
-                            score = member.score
+                            score = member.score,
+                            joinedAt = member.joinedAt,
+                            lastScore = member.lastScore // Added map
                         )
                     }
                     _connectedUsers.value = membersList
 
                     // Update stage users
-                    val stageList = room.stage.values.map { member ->
+                    // Update stage users (Sorted by Joined Time for Playback Order)
+                    val rawStageList = room.stage.values.sortedBy { it.joinedAt }
+                    
+                    val stageList = rawStageList.map { member ->
                         PartyUser(
                             id = member.uid,
                             name = member.displayName,
                             avatar = member.avatar,
                             color = Color(member.color),
-                            score = member.score
+                            score = member.score,
+                            joinedAt = member.joinedAt,
+                            lastScore = member.lastScore // Added map
                         )
                     }
                     _stageUsers.value = stageList
+
+                    // Audio Controller: First person on stage
+                    _audioControllerId.value = rawStageList.firstOrNull()?.uid ?: ""
 
                     // Update Queue (Map to List sorted by timestamp or natural order)
                     // Note: Firebase push keys are time-ordered essentially.
@@ -503,4 +542,35 @@ class PartyViewModel @Inject constructor(
 
     // Karaoke-specific functions (loadSongResources, updateScore, endSongForAll)
     // have been moved to KaraokePartyController for better separation of concerns
+
+    // --- REACTION LOGIC ---
+    
+    private val _reactionEvent = kotlinx.coroutines.flow.MutableSharedFlow<com.tinsic.app.data.model.PartyReaction>()
+    val reactionEvent = _reactionEvent.asSharedFlow()
+
+    private var reactionJob: Job? = null
+
+    // Call this when entering a Room
+    private fun subscribeToReactions(roomId: String) {
+        reactionJob?.cancel()
+        reactionJob = viewModelScope.launch {
+            partyRepository.observeReactions(roomId).collect { reaction ->
+                // Emit to UI
+                _reactionEvent.emit(reaction)
+            }
+        }
+    }
+    
+    fun sendReaction(emoji: String) {
+        val user = _currentUser.value
+        val reaction = com.tinsic.app.data.model.PartyReaction(
+            userId = user.id,
+            userName = user.name,
+            emoji = emoji,
+            timestamp = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            partyRepository.sendReaction(_roomId.value, reaction)
+        }
+    }
 }

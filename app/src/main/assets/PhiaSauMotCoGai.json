@@ -1,4 +1,16 @@
 {
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 118.177,
+      "singer": 1
+    },
+    {
+      "start": 118.177,
+      "end": 272.602,
+      "singer": 2
+    }
+  ],
   "tracks": [
     {
       "instrument": {

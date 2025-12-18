@@ -36,9 +36,10 @@ data class UserMember(
     @get:com.google.firebase.database.PropertyName("playing")
     @set:com.google.firebase.database.PropertyName("playing")
     var isPlaying: Boolean = false,
-    val joinedAt: Long = 0L
+    val joinedAt: Long = 0L,
+    val lastScore: Int = 0 // Score of the most recent performance
 ) {
-    constructor() : this("", "", "👤", 0, 0xFF000000, false, 0L)
+    constructor() : this("", "", "👤", 0, 0xFF000000, false, 0L, 0)
 }
 
 data class QueueSong(

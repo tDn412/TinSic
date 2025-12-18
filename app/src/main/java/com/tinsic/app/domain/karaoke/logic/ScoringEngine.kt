@@ -16,7 +16,7 @@ class ScoringEngine @Inject constructor() {
     private val COLOR_WEAK = 0xFFFFC107 // Vàng
     private val COLOR_GRAY = 0xFF808080 // Xám
 
-    fun evaluate(userMidi: Float, targetMidi: Int, targetNoteName: String, confidence: Float, rms: Float, currentTime: Double): SingingResult {
+    fun evaluate(userMidi: Float, targetMidi: Int, targetNoteName: String, confidence: Float, rms: Float, currentTime: Double, isMyTurn: Boolean = true): SingingResult {
 
         val isSinging = userMidi > 0 && confidence > CONFIDENCE_THRESHOLD && rms > RMS_THRESHOLD
 
@@ -32,8 +32,15 @@ class ScoringEngine @Inject constructor() {
             val remainder = diff % 12.0f
             val distance = if (remainder > 6) (12 - remainder) else remainder
 
+            // Check turn first
+            if (!isMyTurn) {
+                 // Not my turn: No score, neutral feedback
+                 scoreAdded = 0
+                 text = "" 
+                 color = COLOR_GRAY 
+            }
             // 1. Chuẩn (Perfect): Sai số < 1.5 bán cung (Cũ là 1.0)
-            if (distance < 1.0f) {
+            else if (distance < 1.0f) {
                 isHit = true
                 scoreAdded = 5
                 text = "Tuyệt vời!"

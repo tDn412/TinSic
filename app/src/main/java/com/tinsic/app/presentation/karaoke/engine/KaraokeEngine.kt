@@ -20,9 +20,14 @@ import java.util.Arrays
 import javax.inject.Inject
 
 data class KaraokeConfig(
-    val isPlaybackEnabled: Boolean = true,
-    val isRecordingEnabled: Boolean = true,
-    val initialLatencyOffsetMs: Int = 0
+    val audioUrl: String = "",                    // Fallback: URL for streaming audio
+    val mp3FilePath: String? = null,              // Preferred: Local file path (instant load!)
+    val isPlaybackEnabled: Boolean = true,        // Host-only flag
+    val isRecordingEnabled: Boolean = true,       // Always true for scoring
+    val startTimeMs: Long = 0L,                   // Server start time for guest sync
+    val initialLatencyOffsetMs: Int = 0,
+    val mySingerId: Int = 1,                      // 1=Singer1, 2=Singer2 (For Duet Scoring)
+    val isSoloMode: Boolean = false               // If true, ignore singerId restrictions
 )
 
 class KaraokeEngine @Inject constructor(
@@ -53,7 +58,7 @@ class KaraokeEngine @Inject constructor(
     private var processingJob: Job? = null
 
     private var currentSongNotes: List<SongNote> = emptyList()
-    private var config: KaraokeConfig = KaraokeConfig()
+    internal var config: KaraokeConfig = KaraokeConfig()
 
     // Latency Control
     private var latencyOffsetMs: Int = 0
@@ -68,47 +73,112 @@ class KaraokeEngine @Inject constructor(
 
     @SuppressLint("MissingPermission")
     fun startRecording(songNotes: List<SongNote>, config: KaraokeConfig = KaraokeConfig()) {
-        if (isRunning) return
-
+        if (isRunning) {
+            // Hot-swap: If playback role changes (e.g. Guest -> Audio Controller), RESTART
+            if (this.config.isPlaybackEnabled != config.isPlaybackEnabled) {
+                android.util.Log.w("KaraokeEngine", "♻️ Restarting engine due to playback role change (Play: ${this.config.isPlaybackEnabled} -> ${config.isPlaybackEnabled})")
+                stopRecording()
+                // Continue to start new session...
+            } else {
+                return // Already running with correct config
+            }
+        }
+        
         this.currentSongNotes = songNotes
         this.config = config
         this.latencyOffsetMs = config.initialLatencyOffsetMs
         isRunning = true
 
-        // 1. Init Media Player (if enabled)
-        if (config.isPlaybackEnabled) {
-            // Note: R.raw.beat_phia_sau_mot_co_gai needs to exist or handle error
-            // Using try-catch to avoid crash if resource missing
-            try {
-               // Placeholder for resource ID, user must provide the file name or ID mapped
-               // For now assume the user will copy the MP3 to res/raw
-               val resId = context.resources.getIdentifier("beat_phia_sau_mot_co_gai", "raw", context.packageName)
-               if(resId != 0) {
-                    mediaPlayer = MediaPlayer.create(context, resId).apply {
-                        setVolume(1.0f, 1.0f)
-                        start()
-                    }
-               }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        // 2. Init AudioRecord (if enabled)
-        if (config.isRecordingEnabled) {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                BUFFER_SIZE
-            )
-            audioRecord?.startRecording()
-        }
-
-        // 3. Start Processing Loop
+        // Start processing job that will initialize everything
         processingJob = CoroutineScope(Dispatchers.IO).launch {
+            // 1. Init Media Player (HOST ONLY)
+            if (config.isPlaybackEnabled) {
+                // Prefer local file (instant!), fallback to streaming
+                val useLocalFile = !config.mp3FilePath.isNullOrEmpty()
+                
+                if (useLocalFile) {
+                    android.util.Log.d("KaraokeEngine", "[HOST] Loading from PREFETCHED file: ${config.mp3FilePath}")
+                } else {
+                    android.util.Log.d("KaraokeEngine", "[HOST] Streaming from URL (no cache): ${config.audioUrl}")
+                }
+                
+                try {
+                    mediaPlayer = MediaPlayer().apply {
+                        if (useLocalFile) {
+                            // INSTANT LOAD from local file!
+                            setDataSource(config.mp3FilePath!!)
+                        } else {
+                            // FALLBACK: Stream from URL
+                            setDataSource(config.audioUrl)
+                        }
+                        
+                        setVolume(1.0f, 1.0f)
+                        
+                        setOnErrorListener { _, what, extra ->
+                            android.util.Log.e("KaraokeEngine", "[HOST] MediaPlayer error: what=$what, extra=$extra")
+                            true
+                        }
+                        
+                        // Synchronous prepare (blocking in IO thread)
+                        val prepareStartTime = System.currentTimeMillis()
+                        prepare()
+                        val prepareDelayMs = System.currentTimeMillis() - prepareStartTime
+                        
+                        android.util.Log.d("KaraokeEngine", "[HOST] ✅ PREPARED in ${prepareDelayMs}ms! ${if (useLocalFile) "INSTANT" else "Streaming"} - Ready to start!")
+                        // DO NOT start() - will be called separately in startPlayback()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("KaraokeEngine", "[HOST] Failed to init audio: ${e.message}", e)
+                    mediaPlayer = null
+                }
+            } else if (!config.isPlaybackEnabled) {
+                android.util.Log.d("KaraokeEngine", "[GUEST] Playback disabled, no audio will be played")
+            }
+
+            // 2. Init AudioRecord (ALWAYS for pitch detection & scoring)
+            if (config.isRecordingEnabled) {
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    BUFFER_SIZE
+                )
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                    android.util.Log.e("KaraokeEngine", "AudioRecord initialization failed!")
+                } else {
+                    audioRecord?.startRecording()
+                    android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
+                }
+            }
+
+            // 3. Start Processing Loop (MediaPlayer is ready now!)
+            android.util.Log.d("KaraokeEngine", "Starting processing loop...")
             processingLoop()
+        }
+    }
+
+    /**
+     * PHASE 2: Start playback (call when PLAYING state begins)
+     * MediaPlayer must already be prepared by startRecording()!
+     */
+    fun startPlayback() {
+        if (!isRunning) {
+            android.util.Log.w("KaraokeEngine", "[HOST] Cannot start - engine not prepared!")
+            return
+        }
+        
+        try {
+            mediaPlayer?.let { player ->
+                if (!player.isPlaying) {
+                    player.start()
+                    android.util.Log.d("KaraokeEngine", "[HOST] 🎵 PLAYBACK STARTED!")
+                } else {
+                    android.util.Log.w("KaraokeEngine", "[HOST] Already playing!")
+                }
+            } ?: android.util.Log.w("KaraokeEngine", "[HOST] MediaPlayer not initialized!")
+        } catch (e: Exception) {
+            android.util.Log.e("KaraokeEngine", "[HOST] Failed to start playback: ${e.message}", e)
         }
     }
 
@@ -163,14 +233,32 @@ class KaraokeEngine @Inject constructor(
                      // Keep running if it's just missing resource, but time will be 0
                 }
                 
-                if (config.isPlaybackEnabled && player != null && !player.isPlaying && isRunning) {
-                     break
-                }
+                // WARNING: This check caused early exit during PREPARE phase (player exists but not started)
+                // if (config.isPlaybackEnabled && player != null && !player.isPlaying && isRunning) {
+                //      break
+                // }
 
+                // Calculate current time in song
                 val currentSec = if (config.isPlaybackEnabled) {
+                    // Host: Use MediaPlayer position (sync with actual audio!)
                     (player?.currentPosition ?: 0) / 1000.0
                 } else {
-                    0.0 
+                    // Guest: Use server time sync
+                    if (config.startTimeMs > 0) {
+                        val now = System.currentTimeMillis()
+                        val elapsedMs = now - config.startTimeMs
+                        val elapsed = elapsedMs / 1000.0
+                        
+                        // Debug log every 2 seconds
+                        if (elapsedMs % 2000 < 100) {
+                            android.util.Log.d("KaraokeEngine", "[GUEST] Now: $now, StartTime: ${config.startTimeMs}, Elapsed: ${elapsed}s")
+                        }
+                        
+                        elapsed
+                    } else {
+                        android.util.Log.w("KaraokeEngine", "[GUEST] WARNING: startTimeMs = 0! Timing broken!")
+                        0.0
+                    }
                 }
 
                 val manualOffsetSec = latencyOffsetMs / 1000.0
@@ -232,13 +320,18 @@ class KaraokeEngine @Inject constructor(
 
                     // 4. Scoring
                     if (activeNote != null) {
+                        // Check if it's this user's turn
+                        // singerId 3 means BOTH (Duet)
+                        val isMyTurn = config.isSoloMode || activeNote.singerId == 3 || activeNote.singerId == config.mySingerId
+                        
                         val result = scoringEngine.evaluate(
                             userMidi = userMidi,
                             targetMidi = activeNote.midi,
                             targetNoteName = activeNote.name,
                             confidence = confidence,
                             rms = rms,
-                            currentTime = adjustedTime
+                            currentTime = adjustedTime,
+                            isMyTurn = isMyTurn
                         )
                         _singingFlow.emit(result.copy(currentTime = adjustedTime))
                     } else {

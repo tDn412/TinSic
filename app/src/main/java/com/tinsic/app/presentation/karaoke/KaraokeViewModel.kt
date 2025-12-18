@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.tinsic.app.domain.karaoke.model.LyricLine
 import com.tinsic.app.domain.karaoke.model.SongNote
 import com.tinsic.app.presentation.karaoke.engine.KaraokeEngine
+import com.tinsic.app.presentation.karaoke.engine.KaraokeConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -102,7 +103,20 @@ class KaraokeViewModel @Inject constructor(
         }
     }
 
-    fun startSinging(notes: List<SongNote>, lyrics: List<LyricLine>) {
+    fun startSinging(
+    notes: List<SongNote>, 
+    lyrics: List<LyricLine>,
+    audioUrl: String = "",           // Fallback: Streaming URL
+        mp3FilePath: String? = null,     // Preferred: Local prefetched file
+        
+        // REFACTORED: Decoupled from Host. 
+        // This is now determined by who is the "first" person on stage.
+        shouldPlayAudio: Boolean = false, 
+        
+        startTimeMs: Long = 0L,          // Server start time for guest sync
+        mySingerId: Int = 1,             // New: Singer ID (1 or 2)
+        isSoloMode: Boolean = false      // New: Solo Override
+    ) {
         _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
         viewModelScope.launch {
@@ -113,17 +127,87 @@ class KaraokeViewModel @Inject constructor(
                     isRecording = true,
                     isLoading = false,
                     currentScore = 0, 
-                    feedbackText = "Đang phát nhạc...",
+                    feedbackText = if (shouldPlayAudio) "Đang phát nhạc..." else "Sẵn sàng hát...",
                     songNotes = notes, 
                     lyrics = lyrics,
                     userPitchHistory = emptyList()
                 )
             }
 
-            karaokeEngine.startRecording(notes)
+            // Create config with prefetched file support
+            val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
+                audioUrl = audioUrl,
+                mp3FilePath = mp3FilePath,   // Local file (instant load if available!)
+                isPlaybackEnabled = shouldPlayAudio,  // Determined by stage order
+            isRecordingEnabled = true,   // Everyone records for scoring
+            startTimeMs = startTimeMs,   // Server time for guest sync
+            initialLatencyOffsetMs = _latencyOffset.value,
+            mySingerId = mySingerId,
+            isSoloMode = isSoloMode     // Pass to engine
+        )
+
+            karaokeEngine.startRecording(notes, config)
+            android.util.Log.d("KaraokeVM", "Started singing - PlayAudio: $shouldPlayAudio, MP3: ${if (mp3FilePath != null) "LOCAL ✅" else "Stream"}, StartTime: $startTimeMs")
+    }
+}
+
+    /**
+     * PHASE 1: Prepare everything (call during LOADING)
+     */
+    fun prepareSinging(
+        notes: List<SongNote>,
+        lyrics: List<LyricLine>,
+        audioUrl: String = "",
+        mp3FilePath: String? = null,
+        shouldPlayAudio: Boolean = false,
+        mySingerId: Int = 1,
+        isSoloMode: Boolean = false // New
+    ) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    songNotes = notes,
+                    lyrics = lyrics
+                )
+            }
+            
+            val config = KaraokeConfig(
+                audioUrl = audioUrl,
+                mp3FilePath = mp3FilePath,
+                isPlaybackEnabled = shouldPlayAudio,
+                isRecordingEnabled = true,
+                startTimeMs = 0L,
+                initialLatencyOffsetMs = _latencyOffset.value,
+                mySingerId = mySingerId,
+                isSoloMode = isSoloMode // Pass to engine
+            )
+            
+            karaokeEngine.startRecording(notes, config)
+            android.util.Log.d("KaraokeVM", "Prepared - PlayAudio: $shouldPlayAudio, MP3: ${if (mp3FilePath != null) "LOCAL" else "Stream"}")
         }
     }
 
+    /**
+     * PHASE 2: Start playback (call when PLAYING)
+     */
+    fun startPlayback(startTimeMs: Long) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isRecording = true,
+                    isLoading = false,
+                    currentScore = 0,
+                    feedbackText = "Đang hát...",
+                    userPitchHistory = emptyList()
+                )
+            }
+            
+            karaokeEngine.config = karaokeEngine.config.copy(startTimeMs = startTimeMs)
+            karaokeEngine.startPlayback()
+            
+            android.util.Log.d("KaraokeVM", "Playback started at $startTimeMs")
+        }
+    }
      fun stopSinging() {
         karaokeEngine.stopRecording()
         _uiState.update {
@@ -141,12 +225,12 @@ class KaraokeViewModel @Inject constructor(
     }
 
     fun increaseLatency() {
-        val newOffset = _latencyOffset.value + 50
+        val newOffset = _latencyOffset.value + 200
         setLatencyOffset(newOffset)
     }
 
     fun decreaseLatency() {
-        val newOffset = _latencyOffset.value - 50
+        val newOffset = _latencyOffset.value - 200
         setLatencyOffset(newOffset)
     }
 }

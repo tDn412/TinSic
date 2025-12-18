@@ -7,7 +7,9 @@ data class PartyUser(
     val name: String,
     val avatar: String, // Emoji
     val color: Color,
-    val score: Int
+    val score: Int,
+    val joinedAt: Long = 0L, // For sorting
+    val lastScore: Int = 0 // For Result Screen
 )
 
 data class PartySong(

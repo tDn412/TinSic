@@ -31,7 +31,24 @@ object LrcParser {
                     // Standard LRC is usually 2 digits
                     val timeSec = min * 60 + sec + (mil / if(timeMatcher.group(3).length == 3) 1000.0 else 100.0)
                     
-                    lines.add(LyricLine(timeSec, content))
+                    // Parse Singer Tag <1>, <2>, <3>
+                    var singerId = 1
+                    var isDuet = false
+                    var cleanContent = content
+
+                    if (content.startsWith("<1>")) {
+                        singerId = 1
+                        cleanContent = content.substring(3).trim()
+                    } else if (content.startsWith("<2>")) {
+                        singerId = 2
+                        cleanContent = content.substring(3).trim()
+                    } else if (content.startsWith("<3>")) {
+                        singerId = 3 // Special ID for BOTH
+                        isDuet = true
+                        cleanContent = content.substring(3).trim()
+                    }
+
+                    lines.add(LyricLine(timeSec, cleanContent, singerId, isDuet))
                 }
             }
             lineText = reader.readLine()
