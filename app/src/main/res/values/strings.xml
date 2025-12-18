@@ -33,14 +33,14 @@
     <string name="achievement_music_addict_2_title">Ultimate Listener</string>
 
     <!-- Achievement Descriptions -->
-    <string name="achievement_pop_lover_1_description">Listen to 10 Pop songs</string>
-    <string name="achievement_pop_lover_2_description">Listen to 30 Pop songs</string>
-    <string name="achievement_rap_master_1_description">Listen to 5 Rap songs</string>
-    <string name="achievement_rap_master_2_description">Listen to 15 Rap songs</string>
-    <string name="achievement_vietnamese_soul_1_description">Listen to 15 Vietnamese songs</string>
-    <string name="achievement_vietnamese_soul_2_description">Listen to 30 Vietnamese songs</string>
-    <string name="achievement_global_explorer_1_description">Listen to 15 US/UK songs</string>
-    <string name="achievement_global_explorer_2_description">Listen to 30 US/UK songs</string>
+    <string name="achievement_pop_lover_1_description">Listen to 3 Pop songs</string>
+    <string name="achievement_pop_lover_2_description">Listen to 6 Pop songs</string>
+    <string name="achievement_rap_master_1_description">Listen to 3 Rap songs</string>
+    <string name="achievement_rap_master_2_description">Listen to 6 Rap songs</string>
+    <string name="achievement_vietnamese_soul_1_description">Listen to 5 Vietnamese songs</string>
+    <string name="achievement_vietnamese_soul_2_description">Listen to 10 Vietnamese songs</string>
+    <string name="achievement_global_explorer_1_description">Listen to 5 US/UK songs</string>
+    <string name="achievement_global_explorer_2_description">Listen to 10 US/UK songs</string>
     <string name="achievement_music_addict_1_description">Listen to 20 total songs</string>
     <string name="achievement_music_addict_2_description">Listen to 40 total songs</string>
 </resources>

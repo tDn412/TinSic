@@ -175,4 +175,89 @@ class AchievementRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    /**
+     * Check if playing a song triggers any achievements.
+     * Handles logic for GENRE, ARTIST, COUNTRY, and TOTAL_SONGS.
+     */
+    suspend fun checkAndUnlockAchievements(
+        userId: String,
+        song: com.tinsic.app.data.model.Song,
+        allAchievements: List<Achievement>,
+        currentProgress: Map<String, UserAchievementProgress>
+    ): Result<Unit> {
+        return try {
+            val updates = mutableMapOf<String, Pair<Int, Boolean>>()
+            var hasUpdates = false
+
+            for (achievement in allAchievements) {
+                // Skip if already completed (optional: unless we want to track overflow or levels)
+                // For now, let's allow updating progress even if unlocked, but won't re-unlock
+                
+                val progressData = currentProgress[achievement.id]
+                var currentCount = progressData?.currentProgress ?: 0
+                val isUnlocked = progressData?.isUnlocked == true
+                
+                // If already unlocked and we don't care about further progress, skip
+                // But maybe we want to show 100/50? Let's check logic.
+                // For "Streak" or "Total", we might keep counting. 
+                // Let's assume we want to update progress until it hits target, or maybe beyond.
+                // Simple version: Update if not unlocked OR if we want to track accurate counts.
+                
+                var match = false
+                
+                when (achievement.type) {
+                    com.tinsic.app.data.model.profile.AchievementConditionType.LISTEN_GENRE -> {
+                        // Normalize strings: remove spaces, lowercase, distinct separators
+                        val songGenre = song.genre.trim().lowercase()
+                        val targetGenre = achievement.criteriaValue?.trim()?.lowercase() ?: ""
+                        if (songGenre.contains(targetGenre)) {
+                             match = true
+                        }
+                    }
+                    com.tinsic.app.data.model.profile.AchievementConditionType.LISTEN_COUNTRY -> {
+                        // Handle US_UK / US-UK mismatch
+                        val songCountry = normalizeString(song.country)
+                        val targetCountry = normalizeString(achievement.criteriaValue)
+                        if (songCountry == targetCountry) {
+                             match = true
+                        }
+                    }
+                    com.tinsic.app.data.model.profile.AchievementConditionType.LISTEN_ARTIST -> {
+                        if (song.artist.equals(achievement.criteriaValue, ignoreCase = true)) {
+                            match = true
+                        }
+                    }
+                    com.tinsic.app.data.model.profile.AchievementConditionType.TOTAL_SONGS -> {
+                        match = true // Every song counts
+                    }
+                    else -> {
+                        // Other types handled elsewhere (e.g. LIKED_SONGS)
+                    }
+                }
+                
+                if (match) {
+                    currentCount++
+                    val newIsUnlocked = currentCount >= achievement.targetCount
+                    
+                    // Only update if changed
+                    if (currentCount != (progressData?.currentProgress ?: 0) || (newIsUnlocked && !isUnlocked)) {
+                         updates[achievement.id] = Pair(currentCount, newIsUnlocked || isUnlocked)
+                         hasUpdates = true
+                    }
+                }
+            }
+
+            if (hasUpdates) {
+                batchUpdateProgress(userId, updates)
+            } else {
+                Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun normalizeString(input: String?): String {
+        return input?.replace("-", "_")?.replace(" ", "")?.lowercase() ?: ""
+    }
 }

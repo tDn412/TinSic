@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import android.content.Context
 import android.content.Intent
@@ -35,7 +37,8 @@ class PlayerViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val auth: FirebaseAuth,
     @ApplicationContext private val context: Context,
-    private val playbackDataStore: com.tinsic.app.data.local.PlaybackDataStore
+    private val playbackDataStore: com.tinsic.app.data.local.PlaybackDataStore,
+    private val achievementRepository: com.tinsic.app.data.repository.AchievementRepository
 ) : ViewModel() {
 
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -438,6 +441,17 @@ class PlayerViewModel @Inject constructor(
                 // Add to history after 30 seconds of playback
                 auth.currentUser?.uid?.let { userId ->
                     userRepository.addToHistory(userId, song.id)
+                    
+                    launch {
+                        try {
+                            // Collect one-shot from flows
+                            val achievements = achievementRepository.getAllAchievements().first()
+                            val progress = achievementRepository.getUserProgress(userId).first()
+                            achievementRepository.checkAndUnlockAchievements(userId, song, achievements, progress)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
                 }
             }
         }

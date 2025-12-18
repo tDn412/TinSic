@@ -76,7 +76,7 @@ fun shareBitmap(context: Context, bitmap: Bitmap) {
 
     // 2. Lấy URI an toàn bằng FileProvider
     // Sử dụng applicationId hardcode để đảm bảo khớp với AndroidManifest
-    val authority = "com.example.myapplication.fileprovider"
+    val authority = "com.tinsic.app.fileprovider"
     val contentUri = FileProvider.getUriForFile(context, authority, file)
     if (contentUri == null) {
         // Xử lý lỗi nếu không tạo được URI
