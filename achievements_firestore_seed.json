@@ -7,7 +7,7 @@
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/813/813419.png",
       "type": "LISTEN_GENRE",
       "criteriaValue": "Pop",
-      "targetCount": 10,
+      "targetCount": 3,
       "experienceReward": 50,
       "nextTierId": "pop_lover_2"
     },
@@ -18,7 +18,7 @@
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/2928/2928892.png",
       "type": "LISTEN_GENRE",
       "criteriaValue": "Pop",
-      "targetCount": 30,
+      "targetCount": 6,
       "experienceReward": 150,
       "nextTierId": null
     },
@@ -29,7 +29,7 @@
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/2928/2928788.png",
       "type": "LISTEN_GENRE",
       "criteriaValue": "Rap",
-     "targetCount": 5,
+     "targetCount": 3,
       "experienceReward": 40,
       "nextTierId": "rap_master_2"
     },
@@ -40,7 +40,7 @@
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/3048/3048425.png",
       "type": "LISTEN_GENRE",
       "criteriaValue": "Rap",
-      "targetCount": 15,
+      "targetCount": 6,
       "experienceReward": 120,
       "nextTierId": null
     },
@@ -51,7 +51,7 @@
       "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-vietnam_1f1fb-1f1f3.png",
       "type": "LISTEN_COUNTRY",
       "criteriaValue": "Vietnam",
-      "targetCount": 15,
+      "targetCount": 5,
       "experienceReward": 75,
       "nextTierId": "vietnamese_soul_2"
     },
@@ -62,7 +62,7 @@
       "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-vietnam_1f1fb-1f1f3.png",
       "type": "LISTEN_COUNTRY",
       "criteriaValue": "Vietnam",
-      "targetCount": 30,
+      "targetCount": 10,
       "experienceReward": 200,
       "nextTierId": null
     },
@@ -73,7 +73,7 @@
       "iconUrl": "https://em-content.zobj.net/source/twitter/376/flag-united-kingdom_1f1ec-1f1e7.png",
       "type": "LISTEN_COUNTRY",
       "criteriaValue": "US_UK",
-      "targetCount": 15,
+      "targetCount": 5,
       "experienceReward": 75,
       "nextTierId": "global_explorer_2"
     },
@@ -84,7 +84,7 @@
       "iconUrl": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
       "type": "LISTEN_COUNTRY",
       "criteriaValue": "US_UK",
-      "targetCount": 30,
+      "targetCount": 10,
       "experienceReward": 200,
       "nextTierId": null
     },

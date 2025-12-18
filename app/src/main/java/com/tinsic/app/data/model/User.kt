@@ -9,7 +9,7 @@ data class User(
     val hasCompletedOnboarding: Boolean = false,
     val likedSongs: List<String> = emptyList(), // List of Song IDs
     val dislikedSongs: List<String> = emptyList(), // List of Song IDs
-    val achievements: Map<String, Boolean> = emptyMap() // e.g., "dom_con": true
+    val achievements: Map<String, com.tinsic.app.data.model.profile.UserAchievementProgress> = emptyMap() // e.g., "dom_con": { achievementId: "...", ... }
 ) {
     // Empty constructor for Firebase
     constructor() : this("", "", "", "", emptyList(), false, emptyList(), emptyList(), emptyMap())

@@ -60,10 +60,10 @@ class UserRepository @Inject constructor(
         }
     }
 
-    suspend fun updateAchievement(userId: String, achievementKey: String, value: Boolean): Result<Unit> {
+    suspend fun updateAchievement(userId: String, achievementKey: String, progress: com.tinsic.app.data.model.profile.UserAchievementProgress): Result<Unit> {
         return try {
             firestore.collection("users").document(userId)
-                .update("achievements.$achievementKey", value).await()
+                .update("achievements.$achievementKey", progress).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
