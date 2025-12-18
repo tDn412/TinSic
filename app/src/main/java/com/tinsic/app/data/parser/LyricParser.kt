@@ -28,7 +28,7 @@ object LyricParser {
                             (centiseconds.toLong() * 10)
                 
                 if (text.isNotBlank()) {
-                    lines.add(LyricLine(timeMs, text.trim()))
+                    lines.add(LyricLine(timeMs, text.trim(), ""))
                 }
             }
         }

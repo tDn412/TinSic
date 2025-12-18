@@ -34,13 +34,7 @@ fun TinSicNavGraph(
     var showPlayer by remember { mutableStateOf(false) }
     val playerViewModel: PlayerViewModel = hiltViewModel()
 
-    if (showPlayer) {
-        // Full screen player
-        PlayerScreen(
-            viewModel = playerViewModel,
-            onDismiss = { showPlayer = false }
-        )
-    } else {
+    Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = startDestination
@@ -202,6 +196,18 @@ fun TinSicNavGraph(
                  )
             }
         }
+
+        // Full screen player overlay
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showPlayer,
+            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut()
+        ) {
+            PlayerScreen(
+                viewModel = playerViewModel,
+                onDismiss = { showPlayer = false }
+            )
+        }
     }
 }
 
@@ -266,7 +272,7 @@ fun BottomNavigationBar(navController: NavHostController) {
                 onClick = {
                     navController.navigate(item.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                            saveState = item.route != Screen.Home.route
                         }
                         launchSingleTop = true
                         restoreState = true

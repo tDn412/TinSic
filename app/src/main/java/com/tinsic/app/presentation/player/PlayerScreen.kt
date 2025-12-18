@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.tinsic.app.ui.theme.NeonPink
 import com.tinsic.app.ui.theme.NeonPurple
+import com.tinsic.app.data.model.LyricLine
 import kotlinx.coroutines.launch
 
 private typealias RepeatMode = PlayerViewModel.RepeatMode
@@ -112,60 +113,58 @@ fun PlayerScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header (Down Arrow + Title + Options)
+            // Header (Title + Options)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Center, // Centered Title since arrow is gone
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.KeyboardArrowDown, "Dismiss", tint = Color.White)
-                }
+                // Arrow removed as requested
                 
                 Text(
                     text = "Now Playing",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f)
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
                 )
-                
-                // Empty box to balance layout if needed, or just nothing.
-                Box(modifier = Modifier.size(48.dp)) // Placeholder to keep title centered via SpaceBetween
             }
 
-            if (!showLyrics) {
-                Spacer(modifier = Modifier.weight(0.5f))
-            }
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Artwork (Large Rounded Square)
-            if (!showLyrics) {
-                AsyncImage(
-                    model = currentSong?.coverUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(320.dp) // Large Size
-                        .clip(RoundedCornerShape(12.dp))
-                        .shadow(16.dp, RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                // Mini Lyrics View (if wanted in place of art) or Full Lyrics
-                // User asked for Lyrics like screenshot (Full screen text). 
-                // We handle full screen lyrics below as an overlay or here.
-                // Let's keep Artwork here, but if lyrics are ON, we show Lyric View instead of Artwork + Controls
-            }
-
-            // If Lyrics Mode is ON, we replace the middle/bottom section, or overlay it.
-            // Based on screenshot, Lyrics mode is a separate Full View.
-            
-            if (showLyrics) {
-                 LyricsView(
-                    lyrics = lyrics,
-                    currentIndex = currentLyricIndex,
-                    onDismiss = { showLyrics = false },
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(48.dp))
+            // Crossfade between Artwork+Controls and LyricsView
+            androidx.compose.animation.Crossfade(targetState = showLyrics, label = "LyricsTransition") { isLyricsVisible ->
+                if (isLyricsVisible) {
+                     val isTranslationEnabled by viewModel.isTranslationEnabled.collectAsState()
+                     val isTranslating by viewModel.isTranslating.collectAsState()
+                     val isEligible = viewModel.isTranslationEligible()
+                     
+                     LyricsView(
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        onDismiss = { showLyrics = false },
+                        isTranslationEnabled = isTranslationEnabled,
+                        isTranslating = isTranslating,
+                        isTranslationEligible = isEligible,
+                        onToggleTranslation = { viewModel.toggleTranslation() },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Artwork
+                        AsyncImage(
+                            model = currentSong?.coverUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .weight(1f) // Fill available space
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .shadow(16.dp, RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        
+                        Spacer(modifier = Modifier.height(48.dp))
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
 
                 // Song Info
                 Row(
@@ -259,7 +258,7 @@ fun PlayerScreen(
                     }
                     
                     // Next
-                    IconButton(onClick = { viewModel.playNext() }) {
+                    IconButton(onClick = { viewModel.playNext(auto = false) }) {
                         Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(36.dp))
                     }
                     
@@ -276,7 +275,7 @@ fun PlayerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(0.5f))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // Bottom Tools (Lyrics, Sleep, Queue)
                 val context = androidx.compose.ui.platform.LocalContext.current
@@ -303,11 +302,18 @@ fun PlayerScreen(
                         Icon(Icons.Default.PlaylistAdd, "Add to Playlist", tint = Color.White)
                     }
 
-                    // Placeholder for future features or just remove
-                    Spacer(modifier = Modifier.size(48.dp))
+                    IconButton(onClick = { viewModel.toggleLikeCurrentSong() }) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Like",
+                            tint = if (isLiked) NeonPurple else Color.White
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+    }
         }
     }
     
@@ -354,6 +360,20 @@ fun PlayerScreen(
         ) {
             Column(Modifier.padding(16.dp)) {
                 Text("Playing Queue", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                
+                // Status Indicator
+                val shuffleText = if (isShuffleEnabled) "Shuffle: ON" else "Shuffle: OFF"
+                val repeatText = when(repeatMode) {
+                    RepeatMode.OFF -> "Repeat: OFF"
+                    RepeatMode.ONE -> "Repeat: ONE"
+                    RepeatMode.ALL -> "Repeat: ALL"
+                }
+                Text(
+                    text = "$shuffleText | $repeatText",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = NeonPurple,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
                 Spacer(Modifier.height(16.dp))
                 LazyColumn {
                      itemsIndexed(playlist) { index, song ->
@@ -384,123 +404,26 @@ fun PlayerScreen(
     }
 
     if (showPlaylistDialog) {
-        PlaylistSelectionDialog(
-            viewModel = viewModel,
-            onDismiss = { showPlaylistDialog = false }
+        val userPlaylists by viewModel.userPlaylists.collectAsState()
+        com.tinsic.app.presentation.components.PlaylistSelectionDialog(
+            playlists = userPlaylists,
+            onDismiss = { showPlaylistDialog = false },
+            onPlaylistSelected = { playlistId -> viewModel.addToPlaylist(playlistId) },
+            onCreatePlaylist = { name -> viewModel.createPlaylist(name, addCurrentSong = true) }
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PlaylistSelectionDialog(
-    viewModel: PlayerViewModel,
-    onDismiss: () -> Unit
-) {
-    val playlists by viewModel.userPlaylists.collectAsState()
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var newPlaylistName by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-
-    if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text("New Playlist") },
-            text = {
-                OutlinedTextField(
-                    value = newPlaylistName,
-                    onValueChange = { newPlaylistName = it },
-                    label = { Text("Playlist Name") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (newPlaylistName.isNotBlank()) {
-                        viewModel.createPlaylist(newPlaylistName, addCurrentSong = true)
-                        showCreateDialog = false
-                        onDismiss()
-                    }
-                }) {
-                    Text("Create & Add")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color(0xFF1E1E1E)
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Add to Playlist", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-            Spacer(Modifier.height(16.dp))
-            
-            // Create New Option
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showCreateDialog = true }
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(48.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Add, "New", tint = Color.White)
-                }
-                Spacer(Modifier.width(16.dp))
-                Text("New Playlist", color = Color.White, style = MaterialTheme.typography.titleMedium)
-            }
-            
-            Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 8.dp))
-            
-            // Existing Playlists
-            LazyColumn {
-                itemsIndexed(playlists) { _, playlist ->
-                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { 
-                                viewModel.addToPlaylist(playlist.id)
-                                scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                            }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Cover placeholder
-                         Box(
-                            modifier = Modifier.size(48.dp).background(Color.DarkGray, RoundedCornerShape(4.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.QueueMusic, null, tint = Color.White)
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            Text(playlist.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                            Text("${playlist.songIds.size} songs", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(32.dp))
-        }
-    }
-}
 
 @Composable
 fun LyricsView(
-    lyrics: List<com.tinsic.app.data.model.LyricLine>,
+    lyrics: List<LyricLine>,
     currentIndex: Int,
     onDismiss: () -> Unit,
+    isTranslationEnabled: Boolean,
+    isTranslating: Boolean,
+    isTranslationEligible: Boolean,
+    onToggleTranslation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -516,6 +439,39 @@ fun LyricsView(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+         // Header for Lyrics View
+         Row(
+             modifier = Modifier
+                 .fillMaxWidth()
+                 .padding(start = 4.dp, top = 8.dp, end = 16.dp, bottom = 8.dp),
+             horizontalArrangement = Arrangement.SpaceBetween,
+             verticalAlignment = Alignment.CenterVertically
+         ) {
+             IconButton(onClick = onDismiss) {
+                 Icon(Icons.Default.KeyboardArrowDown, "Dismiss", tint = Color.White)
+             }
+             
+             if (isTranslationEligible) {
+                 if (isTranslating) {
+                     CircularProgressIndicator(
+                         modifier = Modifier.size(24.dp).padding(4.dp),
+                         color = NeonPurple,
+                         strokeWidth = 2.dp
+                     )
+                 } else {
+                     IconButton(onClick = onToggleTranslation) {
+                        Icon(
+                             Icons.Default.Translate, 
+                             "Translate", 
+                             tint = if (isTranslationEnabled) NeonPurple else Color.White
+                        )
+                     }
+                 }
+             } else {
+                 Spacer(modifier = Modifier.size(48.dp))
+             }
+         }
+
          LazyColumn(
              state = listState,
              modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -524,17 +480,35 @@ fun LyricsView(
          ) {
              itemsIndexed(lyrics) { index, lyric ->
                  val isCurrent = index == currentIndex
-                 Text(
-                     text = lyric.text,
-                     style = MaterialTheme.typography.headlineMedium,
-                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                     color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.3f),
-                     textAlign = TextAlign.Center,
+                 Column(
                      modifier = Modifier
                          .padding(vertical = 12.dp, horizontal = 24.dp)
                          .fillMaxWidth()
-                         .clickable { /* Seek to lyric time? */ }
-                 )
+                         .clickable { /* Seek to lyric time? */ },
+                     horizontalAlignment = Alignment.CenterHorizontally
+                 ) {
+                     // Original Text
+                     Text(
+                         text = lyric.text,
+                         style = MaterialTheme.typography.headlineMedium,
+                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                         color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.3f),
+                         textAlign = TextAlign.Center
+                     )
+                     
+                     // Translated Text (if enabled and exists)
+                     if (isTranslationEnabled && lyric.translation.isNotBlank()) {
+                         Spacer(modifier = Modifier.height(4.dp))
+                         Text(
+                             text = lyric.translation,
+                             style = MaterialTheme.typography.titleMedium,
+                             fontWeight = FontWeight.Normal,
+                             color = if (isCurrent) NeonPurple else NeonPurple.copy(alpha = 0.6f),
+                             textAlign = TextAlign.Center,
+                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                         )
+                     }
+                 }
              }
          }
     }

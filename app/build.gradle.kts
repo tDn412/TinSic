@@ -32,6 +32,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -66,13 +67,13 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3:1.1.2")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    
+
     // Lifecycle & ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-    
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
@@ -105,6 +106,7 @@ dependencies {
     implementation("androidx.media3:media3-session:1.2.0")
     implementation("androidx.media3:media3-database:1.2.0")
     implementation("androidx.media3:media3-datasource:1.2.0")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     // TensorFlow Lite (Karaoke Module)
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
