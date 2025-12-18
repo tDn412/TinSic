@@ -4,7 +4,7 @@
 ### Thông tin nhóm
 - **Nhóm:** 6
 - **Môn học:** Phát triển ứng dụng di động (INT3120 1)
-- **Giảng viên hướng dẫn:** ThS. [Điền tên GV]
+- **Giảng viên hướng dẫn:** Lê Khánh Trình
 
 | Họ và tên | Mã sinh viên | Email | Github |
 | :--- | :--- | :--- | :--- |
