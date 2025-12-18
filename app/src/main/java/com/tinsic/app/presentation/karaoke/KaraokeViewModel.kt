@@ -107,39 +107,44 @@ class KaraokeViewModel @Inject constructor(
     notes: List<SongNote>, 
     lyrics: List<LyricLine>,
     audioUrl: String = "",           // Fallback: Streaming URL
-    mp3FilePath: String? = null,     // Preferred: Local prefetched file
-    isHost: Boolean = false,         // Host-only playback flag
-    startTimeMs: Long = 0L           // Server start time for guest sync
-) {
-    _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
-
-    viewModelScope.launch {
-        pitchBuffer.clear()
+        mp3FilePath: String? = null,     // Preferred: Local prefetched file
         
-        _uiState.update {
-            it.copy(
-                isRecording = true,
-                isLoading = false,
-                currentScore = 0, 
-                feedbackText = if (isHost) "Đang phát nhạc..." else "Sẵn sàng hát...",
-                songNotes = notes, 
-                lyrics = lyrics,
-                userPitchHistory = emptyList()
-            )
-        }
+        // REFACTORED: Decoupled from Host. 
+        // This is now determined by who is the "first" person on stage.
+        shouldPlayAudio: Boolean = false, 
+        
+        startTimeMs: Long = 0L           // Server start time for guest sync
+    ) {
+        _uiState.update { it.copy(isLoading = true, feedbackText = "Đang tải...") }
 
-        // Create config with prefetched file support
-        val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
-            audioUrl = audioUrl,
-            mp3FilePath = mp3FilePath,   // Local file (instant load if available!)
-            isPlaybackEnabled = isHost,  // Only host plays audio
+        viewModelScope.launch {
+            pitchBuffer.clear()
+            
+            _uiState.update {
+                it.copy(
+                    isRecording = true,
+                    isLoading = false,
+                    currentScore = 0, 
+                    feedbackText = if (shouldPlayAudio) "Đang phát nhạc..." else "Sẵn sàng hát...",
+                    songNotes = notes, 
+                    lyrics = lyrics,
+                    userPitchHistory = emptyList()
+                )
+            }
+
+            // Create config with prefetched file support
+            val config = com.tinsic.app.presentation.karaoke.engine.KaraokeConfig(
+                audioUrl = audioUrl,
+                mp3FilePath = mp3FilePath,   // Local file (instant load if available!)
+                isPlaybackEnabled = shouldPlayAudio,  // Determined by stage order
+
             isRecordingEnabled = true,   // Everyone records for scoring
             startTimeMs = startTimeMs,   // Server time for guest sync
             initialLatencyOffsetMs = _latencyOffset.value
         )
 
-        karaokeEngine.startRecording(notes, config)
-        android.util.Log.d("KaraokeVM", "Started singing - Host: $isHost, MP3: ${if (mp3FilePath != null) "LOCAL ✅" else "Stream"}, StartTime: $startTimeMs")
+            karaokeEngine.startRecording(notes, config)
+            android.util.Log.d("KaraokeVM", "Started singing - PlayAudio: $shouldPlayAudio, MP3: ${if (mp3FilePath != null) "LOCAL ✅" else "Stream"}, StartTime: $startTimeMs")
     }
 }
 
@@ -151,7 +156,7 @@ class KaraokeViewModel @Inject constructor(
         lyrics: List<LyricLine>,
         audioUrl: String = "",
         mp3FilePath: String? = null,
-        isHost: Boolean = false
+        shouldPlayAudio: Boolean = false
     ) {
         viewModelScope.launch {
             _uiState.update {
@@ -164,14 +169,14 @@ class KaraokeViewModel @Inject constructor(
             val config = KaraokeConfig(
                 audioUrl = audioUrl,
                 mp3FilePath = mp3FilePath,
-                isPlaybackEnabled = isHost,
+                isPlaybackEnabled = shouldPlayAudio,
                 isRecordingEnabled = true,
                 startTimeMs = 0L,
                 initialLatencyOffsetMs = _latencyOffset.value
             )
             
             karaokeEngine.startRecording(notes, config)
-            android.util.Log.d("KaraokeVM", "Prepared - Host: $isHost, MP3: ${if (mp3FilePath != null) "LOCAL" else "Stream"}")
+            android.util.Log.d("KaraokeVM", "Prepared - PlayAudio: $shouldPlayAudio, MP3: ${if (mp3FilePath != null) "LOCAL" else "Stream"}")
         }
     }
 

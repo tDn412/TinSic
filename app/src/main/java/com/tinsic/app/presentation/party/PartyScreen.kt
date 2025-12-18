@@ -137,7 +137,7 @@ fun PartyScreen(
                         // Host: Downloads JSON + LRC + MP3
                         // Guest: Downloads JSON + LRC only
                         queueForPrefetch.values.forEach { song ->
-                            karaokeController.prefetchSong(song, isHost)
+                            karaokeController.prefetchSong(song)
                         }
                     }
                     

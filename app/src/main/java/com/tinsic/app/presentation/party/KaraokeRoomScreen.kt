@@ -303,7 +303,7 @@ fun ActivePartyRoom(
                         // Logic: Chỉ hiện nút Mic nếu TÔI đang ở trên STAGE
                         if (isOnStage) {
                             IconButton(
-                                onClick = { onStartSong(song.firebaseId ?: "") },
+                                onClick = { onStartSong(song.firebaseId) },
                                 modifier = Modifier
                                     .size(40.dp)
                                     .background(
@@ -334,6 +334,35 @@ fun ActivePartyRoom(
 
         // --- FULLSCREEN OVERLAY: LOADING & COUNTDOWN ---
         if (playbackState == "LOADING" || playbackState == "COUNTDOWN") {
+            // MOVED UP: Data collection & Preparation Logic needed for both LOADING and COUNTDOWN
+            // This ensures if a user becomes Audio Controller during COUNTDOWN, they still prepare!
+            val karaokeViewModel: com.tinsic.app.presentation.karaoke.KaraokeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            val songNotes by karaokeController.currentSongNotes.collectAsState()
+            val songLyrics by karaokeController.currentSongLyrics.collectAsState()
+            val mp3Path by karaokeController.currentMp3Path.collectAsState()
+            // Use Audio Controller logic (first on stage)
+            val audioControllerId by partyViewModel.audioControllerId.collectAsState()
+            val queueWithUrls by partyViewModel.queueWithUrls.collectAsState()
+            val currentSongId by partyViewModel.currentSongId.collectAsState()
+            
+            // Am I the audio controller?
+            val shouldPlayAudio = currentUser.id == audioControllerId
+            val audioUrl = queueWithUrls[currentSongId]?.audioUrl ?: ""
+            
+            LaunchedEffect(songNotes, songLyrics, audioUrl, mp3Path, shouldPlayAudio) {
+                if (songNotes.isNotEmpty() && songLyrics.isNotEmpty() && audioUrl.isNotEmpty()) {
+                    android.util.Log.d("KaraokeRoom", "[PREPARE] Preparing karaoke (State: $playbackState) - PlayAudio: $shouldPlayAudio")
+                    
+                    karaokeViewModel.prepareSinging(
+                        notes = songNotes,
+                        lyrics = songLyrics,
+                        audioUrl = audioUrl,
+                        mp3FilePath = mp3Path,
+                        shouldPlayAudio = shouldPlayAudio
+                    )
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -344,30 +373,7 @@ fun ActivePartyRoom(
                 when (playbackState) {
                     "LOADING" -> {
                         // Prepare MediaPlayer during LOADING
-                        val karaokeViewModel: com.tinsic.app.presentation.karaoke.KaraokeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                        val songNotes by karaokeController.currentSongNotes.collectAsState()
-                        val songLyrics by karaokeController.currentSongLyrics.collectAsState()
-                        val mp3Path by karaokeController.currentMp3Path.collectAsState()
-                        val hostId by partyViewModel.hostId.collectAsState()
-                        val queueWithUrls by partyViewModel.queueWithUrls.collectAsState()
-                        val currentSongId by partyViewModel.currentSongId.collectAsState()
-                        
-                        val isHost = currentUser.id == hostId
-                        val audioUrl = queueWithUrls[currentSongId]?.audioUrl ?: ""
-                        
-                        LaunchedEffect(songNotes, songLyrics, audioUrl, mp3Path, isHost) {
-                            if (songNotes.isNotEmpty() && songLyrics.isNotEmpty() && audioUrl.isNotEmpty()) {
-                                android.util.Log.d("KaraokeRoom", "[LOADING] Preparing karaoke - Host: $isHost")
-                                
-                                karaokeViewModel.prepareSinging(
-                                    notes = songNotes,
-                                    lyrics = songLyrics,
-                                    audioUrl = audioUrl,
-                                    mp3FilePath = mp3Path,
-                                    isHost = isHost
-                                )
-                            }
-                        }
+                        // Logic moved up ^^
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(
@@ -468,11 +474,12 @@ fun ActivePartyRoom(
             val mp3Path by karaokeController.currentMp3Path.collectAsState()  // Prefetched MP3 path
             
             // Get host ID and queue for audio URL
-            val hostId by partyViewModel.hostId.collectAsState()
+            // Get audio controller element
+            val audioControllerId by partyViewModel.audioControllerId.collectAsState()
             val queueWithUrls by partyViewModel.queueWithUrls.collectAsState()
             
-            // Determine if current user is host
-            val isHost = currentUser.id == hostId
+            // Determine if current user should play audio
+            val shouldPlayAudio = currentUser.id == audioControllerId
             
             // Get audio URL from first song in queue (currently playing)
             val currentSong = queueWithUrls.values.firstOrNull()
@@ -481,22 +488,23 @@ fun ActivePartyRoom(
             android.util.Log.d("KaraokeRoom", "[PLAYING] ========================================")
             android.util.Log.d("KaraokeRoom", "[PLAYING] Notes: ${songNotes.size}, Lyrics: ${songLyrics.size}")
             android.util.Log.d("KaraokeRoom", "[PLAYING] CurrentUser.id: '${currentUser.id}'")
-            android.util.Log.d("KaraokeRoom", "[PLAYING] HostId: '$hostId'")
-            android.util.Log.d("KaraokeRoom", "[PLAYING] IsHost: $isHost (${if(isHost) "WILL PLAY AUDIO" else "NO AUDIO"})")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] AudioControllerId: '$audioControllerId'")
+            android.util.Log.d("KaraokeRoom", "[PLAYING] ShouldPlayAudio: $shouldPlayAudio (${if(shouldPlayAudio) "WILL PLAY AUDIO" else "NO AUDIO"})")
             android.util.Log.d("KaraokeRoom", "[PLAYING] AudioURL: ${audioUrl.take(100)}")
             android.util.Log.d("KaraokeRoom", "[PLAYING] MP3Path: ${mp3Path ?: "None (will stream)"}")
             android.util.Log.d("KaraokeRoom", "[PLAYING] ========================================")
             
             // Wire data to KaraokeViewModel when data is ready
-            LaunchedEffect(songNotes, songLyrics, audioUrl, isHost, startTime, mp3Path) {
+            LaunchedEffect(songNotes, songLyrics, audioUrl, shouldPlayAudio, startTime, mp3Path) {
                 // Check if all data is ready
                 val dataReady = songNotes.isNotEmpty() && songLyrics.isNotEmpty() && audioUrl.isNotEmpty()
                 
                 // Guest needs to wait for startTime to sync from Firebase
-                val timingReady = isHost || startTime > 0
+                // Audio Controller acts as "Host" for sync purposes now (conceptually)
+                val timingReady = shouldPlayAudio || startTime > 0
                 
                 if (dataReady && timingReady) {
-                    android.util.Log.d("KaraokeRoom", "[PLAYING] Starting playback - Host: $isHost, StartTime: $startTime")
+                    android.util.Log.d("KaraokeRoom", "[PLAYING] Starting playback - PlayAudio: $shouldPlayAudio, StartTime: $startTime")
                     
                     // MediaPlayer already prepared in LOADING, just start playback!
                     karaokeViewModel.startPlayback(startTimeMs = startTime)

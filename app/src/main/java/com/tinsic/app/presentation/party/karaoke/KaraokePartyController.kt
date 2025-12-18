@@ -37,7 +37,7 @@ import javax.inject.Inject
 data class CachedSongData(
     val notes: List<SongNote>,
     val lyrics: List<LyricLine>,
-    val mp3FilePath: String? = null,  // Host-only: Path to downloaded MP3
+    val mp3FilePath: String? = null,  // Path to locally downloaded MP3
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -68,10 +68,10 @@ class KaraokePartyController @Inject constructor(
      * Prefetch song resources in background (called when song added to queue)
      * Downloads and caches notes + lyrics + MP3 (host only) for instant loading later
      */
-    fun prefetchSong(song: QueueSong, isHost: Boolean = false) {
+    fun prefetchSong(song: QueueSong) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                Log.d("KaraokeCtrl", "[Prefetch] Starting prefetch for: ${song.title} (Host: $isHost)")
+                Log.d("KaraokeCtrl", "[Prefetch] Starting prefetch for: ${song.title}")
                 
                 // Check if already cached
                 if (prefetchCache.containsKey(song.id)) {
@@ -82,8 +82,8 @@ class KaraokePartyController @Inject constructor(
                 // Download and parse JSON + LRC (all devices)
                 val (notes, lyrics) = downloadAndParseSong(song)
                 
-                // Download MP3 to disk (host only)
-                val mp3FilePath = if (isHost && song.audioUrl.isNotEmpty()) {
+                // Download MP3 to disk (ALWAYS for everyone - needed if they jump on stage)
+                val mp3FilePath = if (song.audioUrl.isNotEmpty()) {
                     try {
                         downloadMP3(song)
                     } catch (e: Exception) {
@@ -127,7 +127,7 @@ class KaraokePartyController @Inject constructor(
                 // 4. Update State
                 _currentSongNotes.value = filteredNotes
                 _currentSongLyrics.value = lyrics
-                _currentMp3Path.value = cached?.mp3FilePath  // Set MP3 path (host only)
+                _currentMp3Path.value = cached?.mp3FilePath  // Set MP3 path
 
                 val mp3Status = if (cached?.mp3FilePath != null) "MP3 ready ✅" else "no MP3"
                 Log.d("KaraokeCtrl", "[LoadSong] ✅ Loaded ${filteredNotes.size} notes, ${lyrics.size} lyrics, $mp3Status")
@@ -214,7 +214,7 @@ class KaraokePartyController @Inject constructor(
     }
     
     /**
-     * Helper: Download MP3 file to internal storage (host only)
+     * Helper: Download MP3 file to internal storage
      * Returns path to downloaded file for instant playback
      */
     private suspend fun downloadMP3(song: QueueSong): String? {

@@ -71,8 +71,17 @@ class KaraokeEngine @Inject constructor(
 
     @SuppressLint("MissingPermission")
     fun startRecording(songNotes: List<SongNote>, config: KaraokeConfig = KaraokeConfig()) {
-        if (isRunning) return
-
+        if (isRunning) {
+            // Hot-swap: If playback role changes (e.g. Guest -> Audio Controller), RESTART
+            if (this.config.isPlaybackEnabled != config.isPlaybackEnabled) {
+                android.util.Log.w("KaraokeEngine", "♻️ Restarting engine due to playback role change (Play: ${this.config.isPlaybackEnabled} -> ${config.isPlaybackEnabled})")
+                stopRecording()
+                // Continue to start new session...
+            } else {
+                return // Already running with correct config
+            }
+        }
+        
         this.currentSongNotes = songNotes
         this.config = config
         this.latencyOffsetMs = config.initialLatencyOffsetMs
