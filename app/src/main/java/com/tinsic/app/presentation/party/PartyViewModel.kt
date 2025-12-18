@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.random.Random
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
@@ -233,6 +234,11 @@ class PartyViewModel @Inject constructor(
                     if (room.roomId != roomId) {
                         Log.w("PartyVM", "Ignored data from wrong room: ${room.roomId} (Current: $roomId)")
                         return@collect
+                    }
+                    
+                    // Start listening to reactions (idempotent call)
+                    if (reactionJob == null || !reactionJob!!.isActive) {
+                         subscribeToReactions(roomId)
                     }
                     
                     // Update Room Type (Auto-detect)
@@ -512,4 +518,35 @@ class PartyViewModel @Inject constructor(
 
     // Karaoke-specific functions (loadSongResources, updateScore, endSongForAll)
     // have been moved to KaraokePartyController for better separation of concerns
+
+    // --- REACTION LOGIC ---
+    
+    private val _reactionEvent = kotlinx.coroutines.flow.MutableSharedFlow<com.tinsic.app.data.model.PartyReaction>()
+    val reactionEvent = _reactionEvent.asSharedFlow()
+
+    private var reactionJob: Job? = null
+
+    // Call this when entering a Room
+    private fun subscribeToReactions(roomId: String) {
+        reactionJob?.cancel()
+        reactionJob = viewModelScope.launch {
+            partyRepository.observeReactions(roomId).collect { reaction ->
+                // Emit to UI
+                _reactionEvent.emit(reaction)
+            }
+        }
+    }
+    
+    fun sendReaction(emoji: String) {
+        val user = _currentUser.value
+        val reaction = com.tinsic.app.data.model.PartyReaction(
+            userId = user.id,
+            userName = user.name,
+            emoji = emoji,
+            timestamp = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            partyRepository.sendReaction(_roomId.value, reaction)
+        }
+    }
 }

@@ -480,6 +480,8 @@ fun ActivePartyRoom(
             
             // Determine if current user should play audio
             val shouldPlayAudio = currentUser.id == audioControllerId
+            // Determine if user is effectively on stage (needs lyrics/sync)
+            val isOnStage = stageUsers.any { it.id == currentUser.id }
             
             // Get audio URL from first song in queue (currently playing)
             val currentSong = queueWithUrls.values.firstOrNull()
@@ -503,7 +505,7 @@ fun ActivePartyRoom(
                 // Audio Controller acts as "Host" for sync purposes now (conceptually)
                 val timingReady = shouldPlayAudio || startTime > 0
                 
-                if (dataReady && timingReady) {
+                if (isOnStage && dataReady && timingReady) {
                     android.util.Log.d("KaraokeRoom", "[PLAYING] Starting playback - PlayAudio: $shouldPlayAudio, StartTime: $startTime")
                     
                     // MediaPlayer already prepared in LOADING, just start playback!
@@ -541,28 +543,52 @@ fun ActivePartyRoom(
             
             // Stop engine when playbackState transitions away from PLAYING
             val previousPlaybackState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-            LaunchedEffect(playbackState) {
-                // Only stop if we were PLAYING before and now we're not
-                if (previousPlaybackState.value == "PLAYING" && playbackState != "PLAYING") {
+            LaunchedEffect(playbackState, isOnStage) {
+                // Stop if we leave PLAYING state OR leave the stage
+                if ((previousPlaybackState.value == "PLAYING" && playbackState != "PLAYING") || !isOnStage) {
                     android.util.Log.d("KaraokeRoom", "[StateChange] Playback state changed from PLAYING to $playbackState - stopping engine")
                     karaokeViewModel.stopSinging()
                 }
                 previousPlaybackState.value = playbackState
             }
             
+            // --- REACTION OVERLAY (On top of everything) ---
+            val reactionEvent = partyViewModel.reactionEvent // Needs to be exposed in PartyViewModel
+            ReactionOverlay(
+                reactionFlow = reactionEvent,
+                modifier = Modifier.fillMaxSize().zIndex(100f) // Top!!
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .zIndex(20f) // Above everything else
+                    .zIndex(20f) // Above background
             ) {
-                com.tinsic.app.presentation.karaoke.KaraokeScreen(
-                    viewModel = karaokeViewModel,
-                    onStopRequested = {
-                        // User confirmed stop → Reset state for everyone
-                        // Use KaraokeController instead of PartyViewModel
-                        karaokeController.endSongForAll(roomId)
-                    }
-                )
+                if (isOnStage) {
+                    // STAGE VIEW (Singers & Backup)
+                    // Everyone on stage sees the Lyrics.
+                    // Only the AudioController (mapped via shouldPlayAudio) will actually emit sound/record.
+                    com.tinsic.app.presentation.karaoke.KaraokeScreen(
+                        viewModel = karaokeViewModel,
+                        onStopRequested = {
+                            // User confirmed stop → Reset state for everyone
+                            karaokeController.endSongForAll(roomId)
+                        }
+                    )
+                } else {
+                    // AUDIENCE VIEW (Off Stage)
+                    // Find singer info
+                    val singer = stageUsers.firstOrNull { it.id == audioControllerId }
+                    
+                    AudienceScreen(
+                        currentSong = queue.find { it.firebaseId == currentSong?.id } 
+                                     ?: queue.firstOrNull(), // Fallback
+                        singer = singer,
+                        onSendReaction = { emoji ->
+                            partyViewModel.sendReaction(emoji)
+                        }
+                    )
+                }
             }
         }
         

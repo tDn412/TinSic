@@ -443,4 +443,50 @@ class PartyRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
+    // --- REACTION FUNCTIONS ---
+
+    suspend fun sendReaction(roomId: String, reaction: com.tinsic.app.data.model.PartyReaction): Result<Unit> {
+        return try {
+            val ref = realtimeDb.getReference("parties").child(roomId).child("reactions").push()
+            // Auto-prune logic could go here (e.g. Firebase Cloud Functions), but for client side we just push.
+            // Reaction ID is the key
+            val reactionWithId = reaction.copy(id = ref.key ?: "")
+            ref.setValue(reactionWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun observeReactions(roomId: String): Flow<com.tinsic.app.data.model.PartyReaction> = callbackFlow {
+        val ref = realtimeDb.getReference("parties").child(roomId).child("reactions")
+        // Get reactions only from NOW onwards (crudely implemented via limitToLast or timestamp check)
+        // Ideally, we just listen to ChildAdded.
+        // To avoid fetching old reactions, we could limit to last 1 or rely on ephemeral nature.
+        // Better: Query by timestamp > joinTime?
+        // Simpler: limitToLast(1) initially, then receive new ones.
+        
+        val listener = object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val reaction = snapshot.getValue(com.tinsic.app.data.model.PartyReaction::class.java)
+                if (reaction != null) {
+                    // Filter old reactions if needed (e.g. older than 5 seconds)
+                    if (System.currentTimeMillis() - reaction.timestamp < 10000) {
+                        trySend(reaction)
+                    }
+                }
+            }
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        
+        // Listen to only the most recent/new reactions
+        ref.limitToLast(10).addChildEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
 }

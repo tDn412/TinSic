@@ -142,8 +142,12 @@ class KaraokeEngine @Inject constructor(
                     AudioFormat.ENCODING_PCM_16BIT,
                     BUFFER_SIZE
                 )
-                audioRecord?.startRecording()
-                android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                    android.util.Log.e("KaraokeEngine", "AudioRecord initialization failed!")
+                } else {
+                    audioRecord?.startRecording()
+                    android.util.Log.d("KaraokeEngine", "AudioRecord started for pitch detection")
+                }
             }
 
             // 3. Start Processing Loop (MediaPlayer is ready now!)
