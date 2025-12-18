@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Đường dẫn đến thư mục bộ nhớ cache của ứng dụng (context.cacheDir).
-         Đây là nơi an toàn để lưu các file tạm thời như ảnh chụp để chia sẻ. -->
-    <cache-path name="shared_images" path="/" />
-</paths>
