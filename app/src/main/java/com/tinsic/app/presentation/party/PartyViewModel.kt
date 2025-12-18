@@ -180,6 +180,26 @@ class PartyViewModel @Inject constructor(
                     }
                 }
             }
+                }
+
+
+        // Result: Auto-transition to IDLE after 10 seconds
+        viewModelScope.launch {
+            playbackState.collect { state ->
+                if (state == "RESULT") {
+                    // Only Audio Controller triggers the transition
+                    if (_currentUser.value.id == _audioControllerId.value) {
+                         Log.d("PartyVM", "[Result] Showing result screen (10s)...")
+                         kotlinx.coroutines.delay(10000) // 10 seconds
+                         
+                         // Double check we are still in RESULT state
+                         if (_playbackState.value == "RESULT") {
+                             Log.d("PartyVM", "[Result] Finished! returning to IDLE.")
+                             partyRepository.updatePlaybackState(_roomId.value, "IDLE", 0L)
+                         }
+                    }
+                }
+            }
         }
     }
 
@@ -255,7 +275,8 @@ class PartyViewModel @Inject constructor(
                             avatar = member.avatar,
                             color = Color(member.color),
                             score = member.score,
-                            joinedAt = member.joinedAt // Added
+                            joinedAt = member.joinedAt,
+                            lastScore = member.lastScore // Added map
                         )
                     }
                     _connectedUsers.value = membersList
@@ -271,7 +292,8 @@ class PartyViewModel @Inject constructor(
                             avatar = member.avatar,
                             color = Color(member.color),
                             score = member.score,
-                            joinedAt = member.joinedAt // Added
+                            joinedAt = member.joinedAt,
+                            lastScore = member.lastScore // Added map
                         )
                     }
                     _stageUsers.value = stageList

@@ -22,12 +22,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
+import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import com.tinsic.app.presentation.party.PartyUser
 import com.tinsic.app.presentation.party.PartySong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.tinsic.app.presentation.karaoke.KaraokeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +55,9 @@ fun ActivePartyRoom(
 ) {
     var showMembersSheet by remember { mutableStateOf(false) }
     var showPermissionMessage by remember { mutableStateOf(false) }
+
+    // Hoisted ViewModel
+    val karaokeViewModel: KaraokeViewModel = hiltViewModel()
 
     // Permission handling for microphone access
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -480,7 +486,7 @@ fun ActivePartyRoom(
         // --- FULLSCREEN OVERLAY: KARAOKE SCREEN ---
         if (playbackState == "PLAYING") {
             // Get both ViewModels
-            val karaokeViewModel: com.tinsic.app.presentation.karaoke.KaraokeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            // karaokeViewModel is hoisted
             val songNotes by karaokeController.currentSongNotes.collectAsState()  // From KaraokeController
             val songLyrics by karaokeController.currentSongLyrics.collectAsState()  // From KaraokeController
             val mp3Path by karaokeController.currentMp3Path.collectAsState()  // Prefetched MP3 path
@@ -536,19 +542,27 @@ fun ActivePartyRoom(
             val karaokeUiState by karaokeViewModel.uiState.collectAsState()
             
             // Save score when leaving PLAYING state
+            val currentStageUsers by rememberUpdatedState(stageUsers) // Capture latest data
+            
             androidx.compose.runtime.DisposableEffect(Unit) {
                 onDispose {
                     // User left PLAYING state (stopped or finished)
                     android.util.Log.d("KaraokeRoom", "[Cleanup] Leaving PLAYING state - stopping engine")
                     
-                    // Stop karaoke engine (stops MediaPlayer and AudioRecord)
+                    // Stop karaoke engine
                     karaokeViewModel.stopSinging()
                     
-                    // Save final score
+                    // Save final score (ACCUMULATED)
                     val finalScore = karaokeUiState.currentScore
                     if (finalScore > 0) {
-                        android.util.Log.d("KaraokeRoom", "[ScoreSync] Saving final score: $finalScore")
-                        karaokeController.updateScore(roomId, currentUser.id, finalScore)
+                        // Find my previous score to add to
+                        val me = currentStageUsers.find { it.id == currentUser.id }
+                        val previousScore = me?.score ?: 0
+                        val newTotalScore = previousScore + finalScore
+                        
+                        android.util.Log.d("KaraokeRoom", "[ScoreSync] Score: $finalScore, Previous: $previousScore, NewTotal: $newTotalScore")
+                        // Pass both scores: New Total AND Session Score
+                        karaokeController.updateScore(roomId, currentUser.id, newTotalScore, finalScore)
                     }
                 }
             }
@@ -570,96 +584,246 @@ fun ActivePartyRoom(
                 reactionFlow = reactionEvent,
                 modifier = Modifier.fillMaxSize().zIndex(100f) // Top!!
             )
+ 
+             Box(
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .zIndex(20f) // Above background
+             ) {
+                 if (isOnStage) {
+                     // STAGE VIEW (Singers & Backup)
+                     // Everyone on stage sees the Lyrics.
+                     // Only the AudioController (mapped via shouldPlayAudio) will actually emit sound/record.
+                     com.tinsic.app.presentation.karaoke.KaraokeScreen(
+                         viewModel = karaokeViewModel,
+                         onStopRequested = {
+                             // User confirmed stop → Reset state for everyone
+                             karaokeController.endSongForAll(roomId)
+                         }
+                     )
+                 } else {
+                     // AUDIENCE VIEW (Off Stage)
+                     // Find singer info
+                     val singer = stageUsers.firstOrNull { it.id == audioControllerId }
+                     
+                     AudienceScreen(
+                         currentSong = queue.find { it.firebaseId == currentSong?.id } 
+                                      ?: queue.firstOrNull(), // Fallback
+                         singer = singer,
+                         onSendReaction = { emoji ->
+                             partyViewModel.sendReaction(emoji)
+                         }
+                     )
+                 }
+             }
+         }
+         
+         // --- PERMISSION DENIED MESSAGE ---
+         if (showPermissionMessage) {
+             androidx.compose.material3.Snackbar(
+                 modifier = Modifier.padding(16.dp),
+                 action = {
+                     androidx.compose.material3.TextButton(onClick = { showPermissionMessage = false }) {
+                         androidx.compose.material3.Text("OK")
+                     }
+                 },
+                 dismissAction = {
+                     androidx.compose.material3.IconButton(onClick = { showPermissionMessage = false }) {
+                         androidx.compose.material3.Icon(Icons.Default.Close, contentDescription = "Close")
+                     }
+                 }
+             ) {
+                 androidx.compose.material3.Text("Cần quyền mic để chấm điểm khi hát 🎤")
+             }
+         }
+ 
+ 
+     // --- FULLSCREEN OVERLAY: RESULT SCREEN ---
+        if (playbackState == "RESULT") {
+            // Retrieve ViewModel to access local score state
+            // karaokeViewModel is hoisted
+            val karaokeUiState by karaokeViewModel.uiState.collectAsState()
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(20f) // Above background
-            ) {
-                if (isOnStage) {
-                    // STAGE VIEW (Singers & Backup)
-                    // Everyone on stage sees the Lyrics.
-                    // Only the AudioController (mapped via shouldPlayAudio) will actually emit sound/record.
-                    com.tinsic.app.presentation.karaoke.KaraokeScreen(
-                        viewModel = karaokeViewModel,
-                        onStopRequested = {
-                            // User confirmed stop → Reset state for everyone
-                            karaokeController.endSongForAll(roomId)
-                        }
-                    )
-                } else {
-                    // AUDIENCE VIEW (Off Stage)
-                    // Find singer info
-                    val singer = stageUsers.firstOrNull { it.id == audioControllerId }
-                    
-                    AudienceScreen(
-                        currentSong = queue.find { it.firebaseId == currentSong?.id } 
-                                     ?: queue.firstOrNull(), // Fallback
-                        singer = singer,
-                        onSendReaction = { emoji ->
-                            partyViewModel.sendReaction(emoji)
-                        }
-                    )
+            // Find singer info (Audio Controller)
+            val audioControllerId by partyViewModel.audioControllerId.collectAsState()
+            val singer = stageUsers.firstOrNull { it.id == audioControllerId }
+            
+            if (singer != null) {
+                // Determine which score to show
+                val isMyResult = currentUser.id == audioControllerId
+                val sessionScore = karaokeUiState.currentScore
+                val accumulatedScore = singer.score
+                val lastSessionScore = singer.lastScore
+                
+                // Logic: If I am the singer, use my local session score (most accurate).
+                // If I am audience, use the synced 'lastScore' from Firebase.
+                // Fallback: If lastScore is 0 (sync lag), we unfortunately show 0, but NOT total score.
+                val displayScore = if (isMyResult) sessionScore else lastSessionScore
+                
+                LaunchedEffect(displayScore) {
+                     android.util.Log.d("ResultScreen", "ShowResult: Singer=${singer.name}, IsMe=$isMyResult, Session=$sessionScore, RemoteLast=$lastSessionScore, Total=$accumulatedScore, DISPLAY=$displayScore")
                 }
+
+                // Reuse ResultOverlay
+                com.tinsic.app.presentation.party.ResultOverlay(
+                    score = displayScore,
+                    singerName = singer.name,
+                    singerAvatar = singer.avatar,
+                    onClose = {
+                        // Manually close for everyone (Host only, but UI can be local close too)
+                        // If I am the host, updating state affects everyone
+                        if (currentUser.id == audioControllerId) {
+                            karaokeController.returnToIdle(roomId) // Use new function
+                        }
+                    }
+                )
             }
         }
-        
-        // --- PERMISSION DENIED MESSAGE ---
-        if (showPermissionMessage) {
-            androidx.compose.material3.Snackbar(
-                modifier = Modifier.padding(16.dp),
-                action = {
-                    androidx.compose.material3.TextButton(onClick = { showPermissionMessage = false }) {
-                        androidx.compose.material3.Text("OK")
-                    }
-                },
-                dismissAction = {
-                    androidx.compose.material3.IconButton(onClick = { showPermissionMessage = false }) {
-                        androidx.compose.material3.Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-            ) {
-                androidx.compose.material3.Text("Cần quyền mic để chấm điểm khi hát 🎤")
-            }
-        }
-    }
 
-    // Members Bottom Sheet
+    // LEADERBOARD SHEET (Replaces simple Members Sheet)
     if (showMembersSheet) {
         ModalBottomSheet(
             onDismissRequest = { showMembersSheet = false },
-            containerColor = Color(0xFF1A1A1A),
+            containerColor = Color(0xFF121212),
             contentColor = Color.White
         ) {
              Column(modifier = Modifier.padding(24.dp)) {
-                Text("Members List", fontSize = 24.sp, color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Bảng Xếp Hạng", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Room: $roomId", fontSize = 14.sp, color = Color.Gray)
+                    }
+                    
+                    IconButton(onClick = { showMembersSheet = false }) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray)
+                    }
+                }
                 
-                LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                    itemsIndexed(users) { _, user ->
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                           Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(user.color), contentAlignment = Alignment.Center) {
-                                Text(user.avatar)
-                           }
-                           Spacer(modifier = Modifier.width(12.dp))
-                           Text(user.name, color = Color.White)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Sort users by score (Descending)
+                val sortedUsers = users.sortedByDescending { it.score }
+                
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    itemsIndexed(sortedUsers) { index, user ->
+                        val rank = index + 1
+                        val isTop3 = rank <= 3
+                        
+                        val borderColor = when (rank) {
+                            1 -> Color(0xFFFFD700) // Gold
+                            2 -> Color(0xFFC0C0C0) // Silver
+                            3 -> Color(0xFFCD7F32) // Bronze
+                            else -> Color.Transparent
+                        }
+                        
+                        val checkBackground = if (isTop3) Color(0xFF252525) else Color(0xFF1E1E1E)
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(checkBackground)
+                                .border(1.dp, if(isTop3) borderColor.copy(alpha=0.5f) else Color(0xFF333333), RoundedCornerShape(16.dp))
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Rank Badge
+                            Box(
+                                modifier = Modifier.size(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isTop3) {
+                                  Icon(
+                                      imageVector = Icons.Default.EmojiEvents, // Use Medal/Trophy icon
+                                      contentDescription = null,
+                                      tint = borderColor,
+                                      modifier = Modifier.size(28.dp)
+                                  )
+                                  Text(
+                                    "$rank",
+                                    color = Color.Black, 
+                                    fontSize = 10.sp, 
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top=4.dp)
+                                  )
+                                } else {
+                                    Text(
+                                        "$rank",
+                                        color = Color.Gray,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            // Avatar
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(user.color),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(user.avatar, fontSize = 20.sp)
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            // Name & Handle
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(user.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                                Text("@${user.id.take(6).lowercase()}", color = Color.Gray, fontSize = 12.sp)
+                            }
+                            
+                            // Score
+                            Text(
+                                "${user.score}",
+                                color = if(isTop3) Color(0xFF00FFFF) else Color(0xFF00FFFF).copy(alpha=0.7f),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                " pts",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start=4.dp).align(Alignment.Bottom)
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+                
                 Button(
                     onClick = { 
                         showMembersSheet = false
                         onLeaveRoom() 
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) { Text("Leave Room") }
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF330000)), // Dark Red
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Logout, contentDescription = null, tint = Color(0xFFEF4444))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Leave Room", color = Color(0xFFEF4444)) 
+                }
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
-}
+    }
+  }
+
 
 @Composable
 fun SingerAvatar(singer: PartyUser) {

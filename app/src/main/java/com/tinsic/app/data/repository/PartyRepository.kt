@@ -423,20 +423,23 @@ class PartyRepository @Inject constructor(
      * Update member's score in Firebase
      * Updates both members and stage if user is on stage
      */
-    suspend fun updateMemberScore(roomId: String, userId: String, newScore: Int): Result<Unit> {
+
+    suspend fun updateMemberScore(roomId: String, userId: String, newTotalScore: Int, lastScore: Int): Result<Unit> {
         return try {
             val updates = mutableMapOf<String, Any>()
             
-            // Always update in members list
-            updates["members/$userId/score"] = newScore
+            // Update TOTAL score and LAST score in members list
+            updates["members/$userId/score"] = newTotalScore
+            updates["members/$userId/lastScore"] = lastScore
             
             // Also update in stage if user is on stage
-            updates["stage/$userId/score"] = newScore
+            updates["stage/$userId/score"] = newTotalScore
+            updates["stage/$userId/lastScore"] = lastScore
             
             realtimeDb.getReference("parties").child(roomId)
                 .updateChildren(updates).await()
                 
-            android.util.Log.d("PartyRepo", "Score updated: User=$userId, Score=$newScore")
+            android.util.Log.d("PartyRepo", "Score updated: User=$userId, Total=$newTotalScore, Last=$lastScore")
             Result.success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("PartyRepo", "Failed to update score: ${e.message}", e)

@@ -270,11 +270,11 @@ class KaraokePartyController @Inject constructor(
      * Update user's karaoke score in Firebase
      * Updates both members and stage lists
      */
-    fun updateScore(roomId: String, userId: String, score: Int) {
+    fun updateScore(roomId: String, userId: String, totalScore: Int, sessionScore: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            val result = partyRepository.updateMemberScore(roomId, userId, score)
+            val result = partyRepository.updateMemberScore(roomId, userId, totalScore, sessionScore)
             if (result.isSuccess) {
-                Log.d("KaraokeCtrl", "[ScoreSync] ✅ Score updated successfully: $score")
+                Log.d("KaraokeCtrl", "[ScoreSync] ✅ Score updated successfully: Total=$totalScore, Session=$sessionScore")
             } else {
                 Log.e("KaraokeCtrl", "[ScoreSync] ❌ Failed to update score: ${result.exceptionOrNull()}")
             }
@@ -287,7 +287,17 @@ class KaraokePartyController @Inject constructor(
      */
     fun endSongForAll(roomId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            Log.d("KaraokeCtrl", "[EndSong] Resetting playback state to IDLE for all users")
+            Log.d("KaraokeCtrl", "[EndSong] Setting playback state to RESULT for all users")
+            partyRepository.updatePlaybackState(roomId, "RESULT", System.currentTimeMillis())
+        }
+    }
+
+    /**
+     * Dismiss result screen and return to IDLE
+     */
+    fun returnToIdle(roomId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.d("KaraokeCtrl", "[EndSong] Returning to IDLE")
             partyRepository.updatePlaybackState(roomId, "IDLE", 0L)
         }
     }
