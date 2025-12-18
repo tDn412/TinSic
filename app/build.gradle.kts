@@ -100,7 +100,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Coil for Image Loading
-    implementation("io.coil-kt:coil-compose:2.5.0")
+    // implementation("io.coil-kt:coil-compose:2.5.0") // Removed in favor of 2.6.0
 
     // ExoPlayer (Media3) for Audio Playback
     implementation("androidx.media3:media3-exoplayer:1.2.0")
