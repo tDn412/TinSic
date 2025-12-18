@@ -641,42 +641,35 @@ fun ActivePartyRoom(
      // --- FULLSCREEN OVERLAY: RESULT SCREEN ---
         if (playbackState == "RESULT") {
             // Retrieve ViewModel to access local score state
-            // karaokeViewModel is hoisted
             val karaokeUiState by karaokeViewModel.uiState.collectAsState()
-
-            // Find singer info (Audio Controller)
-            val audioControllerId by partyViewModel.audioControllerId.collectAsState()
-            val singer = stageUsers.firstOrNull { it.id == audioControllerId }
             
-            if (singer != null) {
-                // Determine which score to show
-                val isMyResult = currentUser.id == audioControllerId
-                val sessionScore = karaokeUiState.currentScore
-                val accumulatedScore = singer.score
-                val lastSessionScore = singer.lastScore
-                
-                // Logic: If I am the singer, use my local session score (most accurate).
-                // If I am audience, use the synced 'lastScore' from Firebase.
-                // Fallback: If lastScore is 0 (sync lag), we unfortunately show 0, but NOT total score.
-                val displayScore = if (isMyResult) sessionScore else lastSessionScore
-                
-                LaunchedEffect(displayScore) {
-                     android.util.Log.d("ResultScreen", "ShowResult: Singer=${singer.name}, IsMe=$isMyResult, Session=$sessionScore, RemoteLast=$lastSessionScore, Total=$accumulatedScore, DISPLAY=$displayScore")
-                }
+            // Needed to close
+            val audioControllerId by partyViewModel.audioControllerId.collectAsState()
+            
+            // Prepare Leaderboard Data
+            // Show ALL stage users. For ME, use local score. For OTHERS, use synced lastScore.
+            val leaderboardData = remember(stageUsers, karaokeUiState.currentScore, currentUser.id) {
+                stageUsers.map { user ->
+                    if (user.id == currentUser.id) {
+                        // It's me, use local session score
+                        user.copy(lastScore = karaokeUiState.currentScore)
+                    } else {
+                        // It's someone else, use their synced lastScore
+                        user
+                    }
+                }.sortedByDescending { it.lastScore }
+            }
 
-                // Reuse ResultOverlay
-                com.tinsic.app.presentation.party.ResultOverlay(
-                    score = displayScore,
-                    singerName = singer.name,
-                    singerAvatar = singer.avatar,
+            if (leaderboardData.isNotEmpty()) {
+                 LeaderboardOverlay(
+                    results = leaderboardData,
                     onClose = {
-                        // Manually close for everyone (Host only, but UI can be local close too)
-                        // If I am the host, updating state affects everyone
+                        // Only Host/AudioController can return to IDLE for everyone
                         if (currentUser.id == audioControllerId) {
-                            karaokeController.returnToIdle(roomId) // Use new function
+                            karaokeController.returnToIdle(roomId)
                         }
                     }
-                )
+                 )
             }
         }
 
