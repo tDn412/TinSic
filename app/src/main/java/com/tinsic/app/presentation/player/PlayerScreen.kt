@@ -54,6 +54,8 @@ fun PlayerScreen(
     val currentLyricIndex by viewModel.currentLyricIndex.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
     val isLiked by viewModel.isLiked.collectAsState()
+    val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
+    val sleepTimerMode by viewModel.sleepTimerMode.collectAsState()
 
     var showLyrics by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
@@ -291,7 +293,30 @@ fun PlayerScreen(
                      }
                     
                      IconButton(onClick = { showSleepTimer = true }) {
-                         Icon(Icons.Outlined.Timer, "Sleep Timer", tint = Color.White)
+                         // Countdown Display if active
+                         if (sleepTimerRemaining != null && sleepTimerRemaining!! > 0) {
+                             val remaining = sleepTimerRemaining!!
+                             // Format: HH:mm:ss or mm:ss
+                             val hours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(remaining)
+                             val minutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(remaining) % 60
+                             val seconds = java.util.concurrent.TimeUnit.MILLISECONDS.toSeconds(remaining) % 60
+                             
+                             val timeText = if (hours > 0) {
+                                 String.format("%d:%02d:%02d", hours, minutes, seconds)
+                             } else {
+                                 String.format("%02d:%02d", minutes, seconds)
+                             }
+                             
+                             Text(
+                                 text = timeText, 
+                                 color = NeonPurple, 
+                                 style = MaterialTheme.typography.labelSmall, // Small text
+                                 fontWeight = FontWeight.Bold,
+                                 maxLines = 1
+                             )
+                         } else {
+                            Icon(Icons.Outlined.Timer, "Sleep Timer", tint = Color.White)
+                         }
                      }
                     
                     IconButton(onClick = { showQueue = true }) {
@@ -317,35 +342,125 @@ fun PlayerScreen(
         }
     }
     
-    // Sleep Timer Sheet
+    // Sleep Timer Dialog
     if (showSleepTimer) {
-        ModalBottomSheet(
-            onDismissRequest = { showSleepTimer = false },
-            sheetState = sleepTimerSheetState,
-            containerColor = Color(0xFF1E1E1E)
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Sleep Timer", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-                Spacer(Modifier.height(16.dp))
-                listOf(5, 10, 15, 30, 45, 60).forEach { mins ->
-                    TextButton(
-                        onClick = { 
-                            viewModel.setSleepTimer(mins)
-                            scope.launch { sleepTimerSheetState.hide() }.invokeOnCompletion { showSleepTimer = false }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Stop audio in $mins minutes", color = Color.White)
-                    }
+        // Local state for the dialog
+        // Default to current fixed time or 20 mins if off
+        var sliderValue by remember { 
+            mutableFloatStateOf(
+                if (sleepTimerMode is com.tinsic.app.presentation.player.PlayerViewModel.SleepTimerMode.FixedTime) {
+                   val remainingMs = sleepTimerRemaining ?: 0L
+                    (remainingMs / 60000).toFloat().coerceIn(1f, 120f)
+                } else {
+                    30f 
                 }
-                TextButton(
-                    onClick = { 
-                        viewModel.cancelSleepTimer()
-                        scope.launch { sleepTimerSheetState.hide() }.invokeOnCompletion { showSleepTimer = false }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+            ) 
+        }
+        var isEndOfSong by remember { mutableStateOf(sleepTimerMode is com.tinsic.app.presentation.player.PlayerViewModel.SleepTimerMode.EndOfSong) }
+
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showSleepTimer = false }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xFF1E1E1E), // Dark dialog background
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Turn off Timer", color = NeonPink)
+                    Text(
+                        text = "Sleep timer",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Display text
+                    val displayText = if (isEndOfSong) {
+                        "End of song" // Or track duration? Image 1 just shows value if slider. "End of song" button is separate.
+                        // Actually Image 1 shows "120 minutes" under title. 
+                        // If EndOfSong is clicked, maybe disable slider or show "End of current track"
+                    } else {
+                        "${sliderValue.toInt()} minutes"
+                    }
+                    
+                    if (!isEndOfSong) {
+                        Text(
+                            text = displayText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Gray
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Slider
+                    if (!isEndOfSong) {
+                        Slider(
+                             value = sliderValue,
+                             onValueChange = { sliderValue = it },
+                             valueRange = 1f..120f,
+                             steps = 0, // Continuous
+                             colors = SliderDefaults.colors(
+                                 thumbColor = Color(0xFFB26CFF), // Neon Purple thumb
+                                 activeTrackColor = Color(0xFFB26CFF),
+                                 inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                             )
+                        )
+                    } else {
+                        // Placeholder space to keep layout stable or msg
+                        Text("Music will stop after this song.", color = Color.Gray, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                         Spacer(modifier = Modifier.height(20.dp))
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // End of Song Button
+                    OutlinedButton(
+                        onClick = { isEndOfSong = !isEndOfSong },
+                        shape = RoundedCornerShape(50),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isEndOfSong) Color(0xFFB26CFF) else Color.Gray),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (isEndOfSong) Color(0xFFB26CFF) else Color.Gray
+                        )
+                    ) {
+                        Text("End of song")
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { 
+                            // Reset implies turning it off? Or resetting to default? Image 1 has Reset.
+                            // Assuming Reset -> Turn Off
+                            viewModel.cancelSleepTimer()
+                            showSleepTimer = false
+                        }) {
+                            Text("Reset", color = Color.Gray)
+                        }
+
+                        Row {
+                            TextButton(onClick = { showSleepTimer = false }) {
+                                Text("Cancel", color = Color.Gray)
+                            }
+                            TextButton(onClick = { 
+                                if (isEndOfSong) {
+                                    viewModel.setSleepTimerEndOfSong()
+                                } else {
+                                    viewModel.setSleepTimerFixed(sliderValue.toInt())
+                                }
+                                showSleepTimer = false
+                            }) {
+                                Text("OK", color = Color(0xFFB26CFF), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
         }

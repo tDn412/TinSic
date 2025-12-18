@@ -98,7 +98,12 @@ class PlayerViewModel @Inject constructor(
                  _duration.value = exoPlayer.duration.takeIf { it > 0 } ?: 0L
             }
              if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
-                 playNext(auto = true) // Auto play next
+                 if (_sleepTimerMode.value is SleepTimerMode.EndOfSong) {
+                     pause() // Stop playback
+                     cancelSleepTimer() // Reset timer
+                 } else {
+                     playNext(auto = true) // Auto play next
+                 }
             }
         }
         
@@ -493,21 +498,82 @@ class PlayerViewModel @Inject constructor(
 
     private var sleepTimerJob: Job? = null
     
-    // Sleep Timer
-    fun setSleepTimer(minutes: Int) {
-        sleepTimerJob?.cancel()
-        if (minutes > 0) {
-            sleepTimerJob = viewModelScope.launch {
-                delay(minutes * 60 * 1000L)
-                pause()
-                // Optionally stop service or release player here
+    // Sleep Timer Types
+    sealed class SleepTimerMode {
+        object Off : SleepTimerMode()
+        data class FixedTime(val targetTime: Long) : SleepTimerMode() // System time when it ends
+        object EndOfSong : SleepTimerMode()
+    }
+
+    private val _sleepTimerMode = MutableStateFlow<SleepTimerMode>(SleepTimerMode.Off)
+    val sleepTimerMode: StateFlow<SleepTimerMode> = _sleepTimerMode.asStateFlow()
+
+    private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
+    val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
+
+    // Initialize Timer Loop
+    init {
+        viewModelScope.launch {
+             while (isActive) {
+                 updateSleepTimerState()
+                 delay(1000)
+             }
+        }
+    }
+
+    private fun updateSleepTimerState() {
+        when (val mode = _sleepTimerMode.value) {
+            is SleepTimerMode.Off -> {
+                _sleepTimerRemaining.value = null
+            }
+            is SleepTimerMode.FixedTime -> {
+                val remaining = mode.targetTime - System.currentTimeMillis()
+                if (remaining <= 0) {
+                    // Time's up
+                    stopAndClear() // Or pause()
+                    cancelSleepTimer()
+                } else {
+                    _sleepTimerRemaining.value = remaining
+                }
+            }
+            is SleepTimerMode.EndOfSong -> {
+                // If song is playing, remaining = duration - position
+                if (_isPlaying.value) {
+                    val remaining = (_duration.value - _currentPosition.value).coerceAtLeast(0)
+                    _sleepTimerRemaining.value = remaining
+                } else {
+                    // Valid question: if paused in EndOfSong mode, what to show?
+                    // User said: "if choose end of song then when song plays it starts counting"
+                    // So if paused, maybe show current remaining time or a static "End of Song" icon?
+                    // For countdown display purposes, let's show remaining time of song.
+                     val remaining = (_duration.value - _currentPosition.value).coerceAtLeast(0)
+                    _sleepTimerRemaining.value = remaining
+                }
             }
         }
     }
-    
-    fun cancelSleepTimer() {
-        sleepTimerJob?.cancel()
+
+    fun setSleepTimerFixed(minutes: Int) {
+        val targetTime = System.currentTimeMillis() + (minutes * 60 * 1000L)
+        _sleepTimerMode.value = SleepTimerMode.FixedTime(targetTime)
     }
+
+    fun setSleepTimerEndOfSong() {
+        _sleepTimerMode.value = SleepTimerMode.EndOfSong
+    }
+
+    fun cancelSleepTimer() {
+        _sleepTimerMode.value = SleepTimerMode.Off
+        _sleepTimerRemaining.value = null
+    }
+
+    // Hook into Player Listener for EndOfSong triggering
+    // In onPlaybackStateChanged (needs to be inside the listener definition above, but we can't edit that easily without large replacement. 
+    // Ideally we inject this logic or modify the listener. 
+    // Let's modify the listener logic by observing 'playbackState' if possible, or assume listener calls a function we can modify.
+    // The existing listener calls 'playNext(auto=true)' on STATE_ENDED.
+    // We should intercept this if EndOfSong is set.
+
     
     // Queue Management
     fun addToQueue(song: Song) {
