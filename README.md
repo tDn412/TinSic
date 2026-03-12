@@ -1,21 +1,3 @@
-# Báo cáo Bài tập lớn - Môn INT3120 1
-## Đề tài: Xây dựng ứng dụng nghe nhạc & Karaoke thông minh TinSic
-
-### Thông tin nhóm
-- **Nhóm:** 6
-- **Môn học:** Phát triển ứng dụng di động (INT3120 1)
-- **Giảng viên hướng dẫn:** Lê Khánh Trình
-
-| Họ và tên | Mã sinh viên | Email | Github |
-| :--- | :--- | :--- | :--- |
-| **Nhữ Đình Tú** | 23021703 | nhudinhtu1@gmail.com | [@tDn412](https://github.com/tDn412) |
-| **Nguyễn Anh Tuấn** | 23021707 | nguyenanhtuan070305@gmail.com | [@natuan05](https://github.com/natuan05) |
-| **Lê Duy Vũ** | 23021751 | djanh123456@gmail.com | [@notvux00](https://github.com/notvux00) |
-| **Lê Ngọc Quyết** | 23021679 | lengocquyet120305@gmail.com | [@LeeNgocQuyet](https://github.com/LeeNgocQuyet) |
-| **Lê Nhữ Quang** | 23021671 | lvs.hunghoa@gmail.com | [@qu4ll12](https://github.com/qu4ll12) |
-
----
-
 ### 1. Giới thiệu tổng quan
 TinSic là ứng dụng giải trí đa phương tiện trên nền tảng Android, kết hợp giữa trình phát nhạc trực tuyến, tính năng Karaoke chấm điểm thời gian thực và các Minigame âm nhạc tương tác. Dự án hướng tới trải nghiệm người dùng hiện đại, trẻ trung với giao diện Dark Mode (Gravity Theme).
 
@@ -53,7 +35,7 @@ Tích hợp 3 chế độ chơi tương tác để tăng tính giải trí:
 - **Jetpack Compose:** 100% giao diện được viết bằng Toolkit khai báo mới nhất của Google.
 - **Hiệu ứng:** Sử dụng Brush Gradient, Animation cho các màn hình Play, Karaoke để tạo cảm giác "không gian" (Deep Space theme).
 
-### 3. Công nghệ lập trình
+### 3. Công nghệ  
 - **Ngôn ngữ:** Kotlin.
 - **Kiến trúc:** MVVM (Model-View-ViewModel).
 - **UI Framework:** Jetpack Compose (Material Design 3).
